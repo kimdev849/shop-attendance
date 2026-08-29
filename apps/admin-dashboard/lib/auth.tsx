@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "./api";
 
@@ -19,27 +19,29 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-/** Lit le user depuis localStorage une seule fois (synchrone). */
-function readStoredUser(): AuthUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const stored = localStorage.getItem("sa_user");
-    const token = localStorage.getItem("sa_access_token");
-    if (stored && token) return JSON.parse(stored);
-  } catch {
-    // token corrompu, on nettoie
-    localStorage.removeItem("sa_user");
-    localStorage.removeItem("sa_access_token");
-    localStorage.removeItem("sa_refresh_token");
-  }
-  return null;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Initialisation synchrone → pas de flash "Chargement…" à chaque navigation
-  const [user, setUser] = useState<AuthUser | null>(readStoredUser);
-  const [isLoading] = useState(false);
+  // Always start with null + loading=true on both server and client.
+  // This avoids hydration mismatch: server renders "Loading...", client
+  // also renders "Loading..." then useEffect reads localStorage.
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    // Read localStorage only on client, after mount
+    try {
+      const stored = localStorage.getItem("sa_user");
+      const token = localStorage.getItem("sa_access_token");
+      if (stored && token) {
+        setUser(JSON.parse(stored));
+      }
+    } catch {
+      localStorage.removeItem("sa_user");
+      localStorage.removeItem("sa_access_token");
+      localStorage.removeItem("sa_refresh_token");
+    }
+    setIsLoading(false);
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await api.auth.login(email, password);
@@ -47,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("sa_refresh_token", data.refreshToken);
     localStorage.setItem("sa_user", JSON.stringify(data.user));
     setUser(data.user);
+    setIsLoading(false);
     router.push("/dashboard");
   }, [router]);
 
@@ -55,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("sa_refresh_token");
     localStorage.removeItem("sa_user");
     setUser(null);
+    setIsLoading(false);
     router.push("/login");
   }, [router]);
 
