@@ -22,17 +22,17 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
   { href: "/shops", label: "Shops", icon: Store },
-  { href: "/workers", label: "Workers", icon: Users },
+  { href: "/workers", label: "Travailleurs", icon: Users },
   { href: "/attendance", label: "Pointages", icon: Clock },
   { href: "/absences", label: "Absences", icon: CalendarX },
   { href: "/penalties", label: "Pénalités", icon: Banknote },
   { href: "/reports", label: "Rapports", icon: FileBarChart },
   { href: "/devices", label: "Appareils", icon: Tablet },
-  { href: "/users", label: "Users", icon: UserCog, adminOnly: true },
+  { href: "/users", label: "Utilisateurs", icon: UserCog, adminOnly: true },
   { href: "/audit", label: "Historique", icon: ClipboardList, adminOnly: true },
-  { href: "/settings", label: "Réglages", icon: Settings },
+  { href: "/settings", label: "Paramètres", icon: Settings },
 ] as const;
 
 interface SidebarContextValue {
@@ -72,7 +72,7 @@ function DesktopSidebar() {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-bold tracking-tight text-foreground truncate">ShopAttendance</p>
-          <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Platform</p>
+          <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Administration</p>
         </div>
       </div>
 
