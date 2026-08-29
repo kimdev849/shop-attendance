@@ -1,9 +1,6 @@
 # =============================================================================
 # Render Deployment Configuration
 # =============================================================================
-# This file auto-configures your Render services.
-# Import this repo on Render and it will detect this file.
-# =============================================================================
 
 services:
   # ---------------------------------------------------------------------------
@@ -12,7 +9,7 @@ services:
   - type: web
     name: shop-attendance-api
     runtime: node
-    region: frankfurt  # or your preferred region
+    region: frankfurt
     rootDir: .deploy/api
     buildCommand: npm install && npx prisma generate && npm run build
     startCommand: node dist/main
@@ -20,7 +17,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false  # Set manually in Render dashboard
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
@@ -30,33 +27,23 @@ services:
       - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
       - key: CORS_ORIGIN
-        sync: false  # Set to your Vercel frontend URL
+        sync: false
     healthCheckPath: /api/health
     autoDeploy: true
 
   # ---------------------------------------------------------------------------
-  # Frontend Dashboard (Next.js)
+  # Frontend Dashboard (Next.js) - built from monorepo root
   # ---------------------------------------------------------------------------
   - type: web
     name: shop-attendance-dashboard
     runtime: node
     region: frankfurt
-    rootDir: apps/admin-dashboard
-    buildCommand: npm install && npm run build
-    startCommand: npm run start
+    # NO rootDir — build from repo root so monorepo deps resolve
+    buildCommand: npm install && bash apps/admin-dashboard/scripts/prebuild.sh && npm run build:dashboard
+    startCommand: cd apps/admin-dashboard && npm run start
     envVars:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
-        sync: false  # Set to your API Render URL after API is deployed
+        sync: false
     autoDeploy: true
-
-  # ---------------------------------------------------------------------------
-  # PostgreSQL Database
-  # ---------------------------------------------------------------------------
-  - type: pgsql
-    name: shop-attendance-db
-    region: frankfurt
-    plan: free
-    database: shopattendance
-    user: shopattendance
