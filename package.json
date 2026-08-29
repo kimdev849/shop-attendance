@@ -12,7 +12,7 @@
     "dev:api": "npm run start:dev --workspace=apps/api",
     "dev:dashboard": "npm run dev --workspace=apps/admin-dashboard",
     "dev:tablet": "npm run start --workspace=apps/tablet-app",
-    "build:api": "npm run build --workspace=apps/api",
+    "build:api": "npx prisma generate --schema=apps/api/prisma/schema.prisma && rm -rf apps/api/dist && node ./node_modules/typescript/lib/tsc.js -p apps/api/tsconfig.build.json",
     "build:dashboard": "npm run build --workspace=apps/admin-dashboard",
     "db:migrate": "npm run prisma:migrate --workspace=apps/api",
     "db:seed": "npm run prisma:seed --workspace=apps/api",
