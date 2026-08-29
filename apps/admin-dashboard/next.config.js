@@ -11,18 +11,11 @@ const nextConfig = {
     optimizePackageImports: ["lucide-react", "date-fns", "recharts"],
   },
 
-  webpack: (config, { dev }) => {
+  webpack: (config) => {
     // Explicit @/ alias — avoids resolution issues on Linux/Render
-    config.resolve.alias["@"] = path.resolve(__dirname);
+    // Only alias @/ (slash after @), NOT bare @ to avoid CSS conflicts
+    config.resolve.alias["@/"] = path.resolve(__dirname, "./") + "/";
 
-    if (dev) {
-      // Faster HMR: ignore node_modules from watching
-      config.watchOptions = {
-        aggregateTimeout: 50,
-        poll: false,
-        ignored: /node_modules/,
-      };
-    }
     return config;
   },
 };
