@@ -1,0 +1,62 @@
+# =============================================================================
+# Render Deployment Configuration
+# =============================================================================
+# This file auto-configures your Render services.
+# Import this repo on Render and it will detect this file.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # API Backend (NestJS + Prisma + PostgreSQL)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: shop-attendance-api
+    runtime: node
+    region: frankfurt  # or your preferred region
+    rootDir: .deploy/api
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: node dist/main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false  # Set manually in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: CORS_ORIGIN
+        sync: false  # Set to your Vercel frontend URL
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+  # ---------------------------------------------------------------------------
+  # Frontend Dashboard (Next.js)
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: shop-attendance-dashboard
+    runtime: node
+    region: frankfurt
+    rootDir: apps/admin-dashboard
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        sync: false  # Set to your API Render URL after API is deployed
+    autoDeploy: true
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  - type: pgsql
+    name: shop-attendance-db
+    region: frankfurt
+    plan: free
+    database: shopattendance
+    user: shopattendance

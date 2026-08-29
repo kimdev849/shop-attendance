@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "ShopAttendance",
+    "slug": "shop-attendance-tablet",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "shopattendance",
+    "splash": {
+      "backgroundColor": "#0F2A43"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "android": {
+      "package": "com.shopattendance.tablet",
+      "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT"],
+      "adaptiveIcon": {
+        "backgroundColor": "#0F2A43"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Autoriser $(PRODUCT_NAME) à utiliser Face ID pour confirmer votre identité."
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      }
+    }
+  }
+}

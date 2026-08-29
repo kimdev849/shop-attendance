@@ -1,0 +1,36 @@
+{
+  "name": "shop-attendance",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Plateforme de gestion de présence, ponctualité et suivi des travailleurs multi-shops",
+  "workspaces": [
+    "apps/api",
+    "apps/admin-dashboard",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev --workspace=apps/api",
+    "dev:dashboard": "npm run dev --workspace=apps/admin-dashboard",
+    "dev:tablet": "npm run start --workspace=apps/tablet-app",
+    "build:api": "npm run build --workspace=apps/api",
+    "build:dashboard": "npm run build --workspace=apps/admin-dashboard",
+    "db:migrate": "npm run prisma:migrate --workspace=apps/api",
+    "db:seed": "npm run prisma:seed --workspace=apps/api",
+    "db:studio": "npm run prisma:studio --workspace=apps/api",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "overrides": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "argon2@0.40.3": true,
+    "prisma@5.22.0": true
+  }
+}

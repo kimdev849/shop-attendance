@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 210 20% 98%;
+  --foreground: 215 28% 17%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 215 28% 17%;
+
+  --border: 214 20% 88%;
+  --input: 214 20% 88%;
+  --ring: 205 65% 32%;
+
+  --primary: 205 65% 24%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 210 20% 94%;
+  --secondary-foreground: 215 28% 17%;
+
+  --muted: 210 20% 94%;
+  --muted-foreground: 215 14% 45%;
+
+  --accent: 172 66% 30%;
+  --accent-foreground: 0 0% 100%;
+
+  --success: 142 60% 30%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 38 85% 43%;
+  --warning-foreground: 0 0% 100%;
+
+  --destructive: 0 68% 45%;
+  --destructive-foreground: 0 0% 100%;
+
+  --radius: 0.6rem;
+}
+
+.dark {
+  --background: 215 32% 10%;
+  --foreground: 210 20% 92%;
+
+  --card: 215 28% 13%;
+  --card-foreground: 210 20% 92%;
+
+  --border: 215 20% 22%;
+  --input: 215 20% 22%;
+  --ring: 205 65% 45%;
+
+  --primary: 205 65% 45%;
+  --primary-foreground: 215 32% 10%;
+
+  --secondary: 215 22% 18%;
+  --secondary-foreground: 210 20% 92%;
+
+  --muted: 215 22% 18%;
+  --muted-foreground: 215 14% 65%;
+
+  --accent: 172 55% 42%;
+  --accent-foreground: 215 32% 10%;
+
+  --success: 142 50% 42%;
+  --success-foreground: 215 32% 10%;
+
+  --warning: 38 80% 55%;
+  --warning-foreground: 215 32% 10%;
+
+  --destructive: 0 62% 52%;
+  --destructive-foreground: 215 32% 10%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv11", "ss01";
+}
+
+::selection {
+  background-color: hsl(var(--accent) / 0.25);
+}
+
+/* Scrollbar - subtle, professional */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 999px;
+}

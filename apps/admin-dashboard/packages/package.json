@@ -1,0 +1,7 @@
+{
+  "name": "@shop-attendance/shared",
+  "private": true,
+  "workspaces": [
+    "types"
+  ]
+}
