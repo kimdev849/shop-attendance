@@ -10,8 +10,7 @@ services:
     name: shop-attendance-api
     runtime: node
     region: frankfurt
-    # Build from repo root (monorepo), no .deploy/api needed
-    buildCommand: npm install && cd apps/api && npx prisma generate && cd ../.. && npm run build:api
+    buildCommand: npm install && cd apps/api && npx prisma generate && npm run build && cd ../..
     startCommand: cd apps/api && node dist/main
     envVars:
       - key: NODE_ENV
@@ -37,7 +36,6 @@ services:
     name: shop-attendance-dashboard
     runtime: node
     region: frankfurt
-    # Build from apps/admin-dashboard (where tsconfig.json with @/ alias lives)
     buildCommand: npm install && bash apps/admin-dashboard/scripts/prebuild.sh && cd apps/admin-dashboard && npm run build
     startCommand: cd apps/admin-dashboard && npm run start
     envVars:

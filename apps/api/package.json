@@ -4,7 +4,7 @@
   "private": true,
   "description": "Backend API ShopAttendance (NestJS + Prisma + PostgreSQL)",
   "scripts": {
-    "build": "npx nest build",
+    "build": "rm -rf dist && npx tsc -p tsconfig.build.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
