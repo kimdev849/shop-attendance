@@ -10,8 +10,8 @@ services:
     name: shop-attendance-api
     runtime: node
     region: frankfurt
-    buildCommand: npm install && cd apps/api && npx prisma generate && npm run build && cd ../..
-    startCommand: cd apps/api && node dist/main
+    buildCommand: npm install && npx prisma generate --schema=apps/api/prisma/schema.prisma && rm -rf apps/api/dist && npx tsc -p apps/api/tsconfig.build.json
+    startCommand: node apps/api/dist/main.js
     envVars:
       - key: NODE_ENV
         value: production
