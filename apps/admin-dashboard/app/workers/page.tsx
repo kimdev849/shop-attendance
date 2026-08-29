@@ -206,14 +206,18 @@ export default function WorkersPage() {
 
   async function handleSaveFacePhoto() {
     if (!faceTarget || !capturedPhoto) return;
+    if (faceStatus === "no-face") {
+      toast("Impossible d'enregistrer sans visage détecté. Reprenez la photo.", "error");
+      return;
+    }
     setSaving(true);
     try {
       const descriptor = (window as any).__faceDescriptor || null;
-      await apiClient.patch(`/v1/workers/${faceTarget.id}/face-photo`, {
+      await apiClient.patch(`/workers/${faceTarget.id}/face-photo`, {
         facePhoto: capturedPhoto,
         faceDescriptor: descriptor,
       });
-      toast("Photo faciale + descripteur enregistrés.", "success");
+      toast("Photo faciale enregistrée.", "success");
       setFaceTarget(null);
       setCapturedPhoto(null);
       setFaceStatus("idle");
