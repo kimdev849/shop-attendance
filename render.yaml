@@ -26,7 +26,7 @@ services:
       - key: JWT_REFRESH_EXPIRES_IN
         value: 7d
       - key: CORS_ORIGIN
-        sync: false
+        value: https://shop-attendance-dashboard.onrender.com
     autoDeploy: true
 
   # ---------------------------------------------------------------------------
@@ -36,11 +36,11 @@ services:
     name: shop-attendance-dashboard
     runtime: node
     region: frankfurt
-    buildCommand: npm install && bash apps/admin-dashboard/scripts/prebuild.sh && cd apps/admin-dashboard && npm run build
+    buildCommand: bash apps/admin-dashboard/scripts/prebuild.sh && npm install && cd apps/admin-dashboard && npm run build
     startCommand: cd apps/admin-dashboard && npm run start
     envVars:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
-        sync: false
+        value: https://shop-attendance-api.onrender.com
     autoDeploy: true
