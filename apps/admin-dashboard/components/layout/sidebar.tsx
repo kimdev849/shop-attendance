@@ -17,8 +17,12 @@ import {
   ShieldCheck,
   ClipboardList,
   X,
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Tableau de bord", icon: LayoutDashboard },
@@ -59,44 +63,71 @@ export function useSidebar() {
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+  const filteredItems = NAV_ITEMS.filter((item) => !item.adminOnly || user?.role === "ADMIN");
 
   return (
     <>
-      <div className="flex h-16 items-center gap-2 border-b border-border px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-          <ShieldCheck className="h-4 w-4" />
+      {/* Logo */}
+      <div className="flex h-16 items-center gap-3 border-b border-border/50 px-5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-sm">
+          <ShieldCheck className="h-5 w-5" />
         </div>
-        <div>
-          <p className="text-sm font-semibold leading-none">ShopAttendance</p>
-          <p className="text-xs text-muted-foreground">Gestion multi-shops</p>
+        <div className="min-w-0">
+          <p className="text-sm font-bold tracking-tight text-foreground">ShopAttendance</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Administration</p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {NAV_ITEMS.map((item) => {
+      {/* Navigation */}
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
+        {filteredItems.map((item) => {
           const isActive = pathname?.startsWith(item.href);
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150",
                 isActive
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-secondary hover:text-foreground",
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
+              <Icon className={cn(
+                "h-[18px] w-[18px] shrink-0 transition-colors",
+                isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground",
+              )} />
+              <span>{item.label}</span>
+              {isActive && (
+                <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary-foreground/60" />
+              )}
             </Link>
           );
         })}
       </nav>
 
-      <div className="border-t border-border p-3 text-xs text-muted-foreground">
-        ShopAttendance v1.0
+      {/* User info + logout */}
+      <div className="border-t border-border/50 p-3">
+        <div className="flex items-center gap-3 rounded-lg px-3 py-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-primary/20 to-primary/10 text-xs font-bold text-primary">
+            {user?.email?.charAt(0).toUpperCase() ?? "?"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium text-foreground">{user?.email ?? "—"}</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{user?.role ?? "—"}</p>
+          </div>
+          <button
+            onClick={logout}
+            title="Se déconnecter"
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </>
   );
@@ -108,7 +139,7 @@ export function Sidebar() {
   return (
     <>
       {/* Desktop */}
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-border/50 bg-card/50 backdrop-blur-sm md:flex">
         <SidebarContent />
       </aside>
 
@@ -116,13 +147,13 @@ export function Sidebar() {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
           <div
-            className="fixed inset-0 bg-black/50"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="relative z-10 flex w-64 flex-col bg-card shadow-xl">
+          <aside className="relative z-10 flex w-64 flex-col bg-card shadow-2xl">
             <button
               onClick={() => setMobileOpen(false)}
-              className="absolute right-3 top-5 rounded-md p-1 text-muted-foreground hover:text-foreground"
+              className="absolute right-3 top-4 rounded-md p-1 text-muted-foreground hover:text-foreground"
               aria-label="Fermer"
             >
               <X className="h-5 w-5" />

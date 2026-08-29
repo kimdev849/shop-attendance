@@ -100,8 +100,8 @@ export default function WorkersPage() {
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(() => load(), 300);
-    return () => clearTimeout(timeout);
+    load();
+    return () => {};
   }, [load]);
 
   // Reset page on filter change

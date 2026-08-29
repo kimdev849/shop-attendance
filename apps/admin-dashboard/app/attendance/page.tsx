@@ -52,8 +52,8 @@ export default function AttendancePage() {
   }, [search, filters, page, sortBy, sortOrder]);
 
   useEffect(() => {
-    const t = setTimeout(() => load(), 300);
-    return () => clearTimeout(t);
+    load();
+    return () => {};
   }, [load]);
 
   useEffect(() => { setPage(1); }, [search, filters]);

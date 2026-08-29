@@ -54,8 +54,8 @@ export default function DevicesPage() {
   }, [search, filterShop, page]);
 
   useEffect(() => {
-    const t = setTimeout(() => load(), 300);
-    return () => clearTimeout(t);
+    load();
+    return () => {};
   }, [load]);
 
   useEffect(() => { setPage(1); }, [search, filterShop]);

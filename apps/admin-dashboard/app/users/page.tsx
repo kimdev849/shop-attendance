@@ -76,8 +76,8 @@ export default function UsersPage() {
   }, [search, filterRole, page]);
 
   useEffect(() => {
-    const t = setTimeout(() => load(), 300);
-    return () => clearTimeout(t);
+    load();
+    return () => {};
   }, [load]);
 
   useEffect(() => { setPage(1); }, [search, filterRole]);
