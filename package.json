@@ -20,6 +20,9 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down"
   },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  },
   "engines": {
     "node": ">=20.0.0"
   },
