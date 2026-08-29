@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Store, Users, CheckCircle2, Clock, CalendarX, Banknote, TrendingUp, TrendingDown, ArrowRight } from "lucide-react";
+import { Store, Users, CheckCircle2, Clock, CalendarX, Banknote, ArrowRight } from "lucide-react";
 import { AppShell } from "@/components/layout/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,82 +20,40 @@ interface Stats {
   totalPenaltiesAmountPending: number;
 }
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-  accent,
-  trend,
-  trendValue,
-  href,
-}: {
-  icon: any;
-  label: string;
-  value: string | number;
-  accent?: string;
-  trend?: "up" | "down";
-  trendValue?: string;
-  href?: string;
+function StatCard({ icon: Icon, label, value, accent, href }: {
+  icon: any; label: string; value: string | number; accent: string; href?: string;
 }) {
   const content = (
     <Card className="group transition-all duration-200 hover:shadow-md hover:border-primary/20">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-            <p className="text-2xl font-bold tabular-nums tracking-tight text-foreground">{value}</p>
-            {trendValue && (
-              <div className="flex items-center gap-1">
-                {trend === "up" ? (
-                  <TrendingUp className="h-3 w-3 text-green-500" />
-                ) : (
-                  <TrendingDown className="h-3 w-3 text-red-500" />
-                )}
-                <span className={`text-xs font-medium ${trend === "up" ? "text-green-500" : "text-red-500"}`}>
-                  {trendValue}
-                </span>
-              </div>
-            )}
-          </div>
-          <div
-            className="flex h-11 w-11 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-110"
-            style={{ backgroundColor: `hsl(${accent ?? "205 65% 24%"} / 0.1)` }}
-          >
-            <Icon className="h-5 w-5" style={{ color: `hsl(${accent ?? "205 65% 24%"})` }} />
-          </div>
+      <CardContent className="flex items-center justify-between p-4">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
+          <p className="mt-1 text-xl font-bold tabular-nums tracking-tight text-foreground sm:text-2xl">{value}</p>
         </div>
-        {href && (
-          <Link href={href} className="mt-3 flex items-center gap-1 text-xs font-medium text-primary opacity-0 transition-opacity group-hover:opacity-100">
-            Voir plus <ArrowRight className="h-3 w-3" />
-          </Link>
-        )}
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-110 sm:h-11 sm:w-11"
+          style={{ backgroundColor: `hsl(${accent} / 0.1)` }}>
+          <Icon className="h-5 w-5" style={{ color: `hsl(${accent})` }} />
+        </div>
       </CardContent>
     </Card>
   );
-  return content;
+  return href ? <Link href={href}>{content}</Link> : content;
 }
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-6 animate-pulse">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="space-y-4 animate-pulse sm:space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 sm:gap-4">
         {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div className="space-y-2">
-                  <div className="h-2.5 w-24 rounded bg-muted-foreground/10" />
-                  <div className="h-7 w-12 rounded bg-muted-foreground/15" />
-                </div>
-                <div className="h-11 w-11 rounded-xl bg-muted-foreground/10" />
-              </div>
-            </CardContent>
-          </Card>
+          <Card key={i}><CardContent className="flex items-center justify-between p-4">
+            <div className="space-y-2"><div className="h-2.5 w-16 rounded bg-muted-foreground/10" /><div className="h-6 w-10 rounded bg-muted-foreground/15" /></div>
+            <div className="h-10 w-10 rounded-xl bg-muted-foreground/10" />
+          </CardContent></Card>
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card><CardContent className="h-72" /></Card>
-        <Card><CardContent className="h-72" /></Card>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 sm:gap-4">
+        <Card><CardContent className="h-64" /></Card>
+        <Card><CardContent className="h-64" /></Card>
       </div>
     </div>
   );
@@ -112,70 +70,44 @@ export default function DashboardPage() {
     async function load() {
       try {
         const [statsRes, trendRes, shopRes, logsRes] = await Promise.all([
-          api.dashboard.stats(),
-          api.dashboard.dailyTrend(14),
-          api.dashboard.attendanceByShop(),
-          api.auditLogs.list({ limit: 8 }),
+          api.dashboard.stats(), api.dashboard.dailyTrend(14),
+          api.dashboard.attendanceByShop(), api.auditLogs.list({ limit: 6 }),
         ]);
         setStats(statsRes.data);
         setTrend(trendRes.data);
-        setShopDistribution(
-          shopRes.data.map((s: any) => ({
-            shopName: s.shopName,
-            present: s.present,
-            late: s.late,
-            absent: s.absent,
-          })),
-        );
-        setRecentLogs((logsRes.data.data ?? logsRes.data).slice(0, 8));
-      } finally {
-        setLoading(false);
-      }
+        setShopDistribution(shopRes.data.map((s: any) => ({ shopName: s.shopName, present: s.present, late: s.late, absent: s.absent })));
+        setRecentLogs((logsRes.data.data ?? logsRes.data).slice(0, 6));
+      } finally { setLoading(false); }
     }
     load();
   }, []);
 
   return (
     <AppShell title="Tableau de bord">
-      {loading || !stats ? (
-        <DashboardSkeleton />
-      ) : (
-        <div className="space-y-6">
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            <StatCard icon={Store} label="Shops" value={stats.totalShops} accent="205 65% 24%" href="/shops" />
-            <StatCard icon={Users} label="Travailleurs" value={stats.totalWorkers} accent="262 83% 58%" href="/workers" />
-            <StatCard icon={CheckCircle2} label="Présents" value={stats.presentToday} accent="142 71% 45%" trend="up" trendValue="Aujourd'hui" href="/attendance" />
-            <StatCard icon={Clock} label="Retards" value={stats.lateToday} accent="38 85% 50%" trend="down" trendValue="Aujourd'hui" href="/attendance" />
-            <StatCard icon={CalendarX} label="Absents" value={stats.absentToday} accent="0 72% 51%" href="/absences" />
+      {loading || !stats ? <DashboardSkeleton /> : (
+        <div className="space-y-4 sm:space-y-6">
+          {/* Stats — 2 cols on mobile, 3 on sm, 6 on lg */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 sm:gap-4">
+            <StatCard icon={Store} label="Shops" value={stats.totalShops} accent="222 84% 40%" href="/shops" />
+            <StatCard icon={Users} label="Workers" value={stats.totalWorkers} accent="262 83% 58%" href="/workers" />
+            <StatCard icon={CheckCircle2} label="Présents" value={stats.presentToday} accent="152 69% 31%" href="/attendance" />
+            <StatCard icon={Clock} label="Retards" value={stats.lateToday} accent="38 92% 50%" href="/attendance" />
+            <StatCard icon={CalendarX} label="Absents" value={stats.absentToday} accent="0 84% 60%" href="/absences" />
             <StatCard icon={Banknote} label="Pénalités" value={formatFcfa(stats.totalPenaltiesAmountPending)} accent="25 95% 53%" href="/penalties" />
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 sm:gap-4">
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Évolution quotidienne (14 jours)</CardTitle>
-              </CardHeader>
+              <CardHeader className="pb-1"><CardTitle className="text-xs font-semibold uppercase tracking-wider">Tendance 14 jours</CardTitle></CardHeader>
               <CardContent>
-                {trend.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-muted-foreground">Pas encore de données.</p>
-                ) : (
-                  <AttendanceTrendChart data={trend} />
-                )}
+                {trend.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">Pas encore de données.</p> : <AttendanceTrendChart data={trend} />}
               </CardContent>
             </Card>
-
             <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold">Répartition par shop</CardTitle>
-              </CardHeader>
+              <CardHeader className="pb-1"><CardTitle className="text-xs font-semibold uppercase tracking-wider">Par shop</CardTitle></CardHeader>
               <CardContent>
-                {shopDistribution.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-muted-foreground">Pas encore de données.</p>
-                ) : (
-                  <ShopDistributionChart data={shopDistribution} />
-                )}
+                {shopDistribution.length === 0 ? <p className="py-10 text-center text-sm text-muted-foreground">Pas encore de données.</p> : <ShopDistributionChart data={shopDistribution} />}
               </CardContent>
             </Card>
           </div>
@@ -183,33 +115,24 @@ export default function DashboardPage() {
           {/* Recent Activity */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-semibold">Activité récente</CardTitle>
-              <Link href="/audit" className="text-xs font-medium text-primary hover:underline">
-                Tout voir →
-              </Link>
+              <CardTitle className="text-xs font-semibold uppercase tracking-wider">Activité récente</CardTitle>
+              <Link href="/audit" className="text-xs font-medium text-primary hover:underline">Tout voir →</Link>
             </CardHeader>
             <CardContent>
-              {recentLogs.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">Aucune activité récente.</p>
-              ) : (
-                <div className="space-y-1.5">
+              {recentLogs.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">Aucune activité.</p> : (
+                <div className="space-y-1">
                   {recentLogs.map((log: any) => (
-                    <div key={log.id} className="flex items-center justify-between rounded-lg border border-border/50 px-4 py-2.5 transition-colors hover:bg-secondary/50">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-xs font-bold text-muted-foreground">
+                    <div key={log.id} className="flex items-center justify-between rounded-lg px-3 py-2.5 transition-colors hover:bg-secondary/50">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-sm">
                           {actionIcon(log.action)}
                         </div>
-                        <div>
-                          <p className="text-xs">
-                            <span className="font-semibold">{actionLabel(log.action)}</span>
-                            {metaLabel(log.metadata) && (
-                              <span className="ml-1 text-muted-foreground">— {metaLabel(log.metadata)}</span>
-                            )}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">{log.user?.email ?? "Système"}</p>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium truncate">{actionLabel(log.action)}{metaLabel(log.metadata) ? ` — ${metaLabel(log.metadata)}` : ""}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{log.user?.email ?? "Système"}</p>
                         </div>
                       </div>
-                      <span className="whitespace-nowrap text-[11px] text-muted-foreground">{formatDateTime(log.createdAt)}</span>
+                      <span className="shrink-0 ml-2 text-[11px] text-muted-foreground">{formatDateTime(log.createdAt)}</span>
                     </div>
                   ))}
                 </div>
@@ -223,44 +146,23 @@ export default function DashboardPage() {
 }
 
 const ACTION_LABELS: Record<string, string> = {
-  WORKER_CREATED: "Travailleur créé",
-  WORKER_UPDATED: "Travailleur modifié",
-  WORKER_STATUS_ACTIVE: "Activé",
-  WORKER_STATUS_INACTIVE: "Désactivé",
-  WORKER_SCHEDULE_ASSIGNED: "Horaire affecté",
-  SHOP_CREATED: "Shop créé",
-  SHOP_UPDATED: "Shop modifié",
-  SHOP_ACTIVATED: "Shop activé",
-  SHOP_DEACTIVATED: "Shop désactivé",
-  ATTENDANCE_CHECK_IN: "Pointage",
-  ABSENCE_CREATED: "Absence créée",
-  ABSENCE_VALIDATED: "Absence validée",
-  ABSENCE_REJECTED: "Absence rejetée",
-  PENALTY_APPROVED: "Pénalité approuvée",
-  PENALTY_REJECTED: "Pénalité rejetée",
+  WORKER_CREATED: "Travailleur créé", WORKER_UPDATED: "Travailleur modifié",
+  WORKER_STATUS_ACTIVE: "Activé", WORKER_STATUS_INACTIVE: "Désactivé",
+  SHOP_CREATED: "Shop créé", SHOP_UPDATED: "Shop modifié",
+  SHOP_ACTIVATED: "Shop activé", SHOP_DEACTIVATED: "Shop désactivé",
+  ATTENDANCE_CHECK_IN: "Pointage", ABSENCE_CREATED: "Absence créée",
+  ABSENCE_VALIDATED: "Absence validée", ABSENCE_REJECTED: "Absence rejetée",
+  PENALTY_APPROVED: "Pénalité approuvée", PENALTY_REJECTED: "Pénalité rejetée",
   PENALTY_CANCELLED: "Pénalité annulée",
 };
-
-function actionLabel(action: string): string {
-  return ACTION_LABELS[action] ?? action.replace(/_/g, " ");
+function actionLabel(action: string) { return ACTION_LABELS[action] ?? action.replace(/_/g, " "); }
+function actionIcon(action: string) {
+  if (action.includes("SHOP")) return "🏪"; if (action.includes("WORKER")) return "👤";
+  if (action.includes("ATTENDANCE")) return "⏰"; if (action.includes("ABSENCE")) return "📋";
+  if (action.includes("PENALTY")) return "💰"; return "📝";
 }
-
-function actionIcon(action: string): string {
-  if (action.includes("SHOP")) return "🏪";
-  if (action.includes("WORKER")) return "👤";
-  if (action.includes("ATTENDANCE")) return "⏰";
-  if (action.includes("ABSENCE")) return "📋";
-  if (action.includes("PENALTY")) return "💰";
-  return "📝";
-}
-
-function metaLabel(meta: any): string {
-  if (!meta) return "";
-  if (meta.employeeNumber) return meta.employeeNumber;
-  if (meta.name && meta.code) return `${meta.name} (${meta.code})`;
-  if (meta.name) return meta.name;
-  if (meta.email) return meta.email;
-  if (meta.dayOfWeek) return meta.dayOfWeek;
-  if (meta.amount !== undefined) return `${meta.amount} FCFA`;
-  return "";
+function metaLabel(meta: any) {
+  if (!meta) return ""; if (meta.employeeNumber) return meta.employeeNumber;
+  if (meta.name && meta.code) return `${meta.name} (${meta.code})`; if (meta.name) return meta.name;
+  if (meta.email) return meta.email; if (meta.amount !== undefined) return `${meta.amount} FCFA`; return "";
 }
