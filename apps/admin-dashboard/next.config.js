@@ -1,3 +1,5 @@
+const path = require("path");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -9,6 +11,9 @@ const nextConfig = {
   },
 
   webpack: (config, { dev }) => {
+    // Explicit @/ alias — avoids resolution issues on Linux/Render
+    config.resolve.alias["@"] = path.resolve(__dirname);
+
     if (dev) {
       // Faster HMR: ignore node_modules from watching
       config.watchOptions = {
