@@ -16,10 +16,15 @@ export function AppShell({ title, children }: { title: string; children: ReactNo
     }
   }, [isLoading, user, router]);
 
-  if (isLoading || !user) {
+  // L'auth est maintenant synchrone : user est dispo immédiatement.
+  // On ne montre plus un écran de chargement plein écran.
+  if (!user) {
     return (
       <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
-        Chargement...
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span>Redirection vers la connexion…</span>
+        </div>
       </div>
     );
   }
