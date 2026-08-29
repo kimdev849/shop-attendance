@@ -136,9 +136,10 @@ export class WorkersController {
   setFacePhoto(
     @Param("id") id: string,
     @Body("facePhoto") facePhoto: string,
+    @Body("faceDescriptor") faceDescriptor: string | undefined,
     @CurrentUser("userId") userId: string,
   ) {
-    return this.workersService.setFacePhoto(id, facePhoto, userId);
+    return this.workersService.setFacePhoto(id, facePhoto, userId, faceDescriptor);
   }
 
   @Get(":id/face-photo")

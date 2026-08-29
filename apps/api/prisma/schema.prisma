@@ -143,6 +143,7 @@ model Worker {
   pinSetAt       DateTime?    // Date de définition/changement du PIN
   facePhoto      String?      // Photo du visage en base64 pour reconnaissance faciale
   facePhotoSetAt DateTime?
+  faceDescriptor String?      // Descripteur facial (JSON array 128 floats) pour face-api.js
   status         WorkerStatus @default(ACTIVE)
   shopId         String?
   shop           Shop?        @relation(fields: [shopId], references: [id])

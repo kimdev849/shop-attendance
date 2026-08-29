@@ -232,9 +232,9 @@ export class WorkersService {
 
   // --- Photo faciale (Face ID) ---
 
-  async setFacePhoto(id: string, facePhoto: string, actorUserId?: string) {
+  async setFacePhoto(id: string, facePhoto: string, actorUserId?: string, faceDescriptor?: string) {
     await this.ensureExists(id);
-    await this.repository.update(id, { facePhoto, facePhotoSetAt: new Date() });
+    await this.repository.update(id, { facePhoto, facePhotoSetAt: new Date(), ...(faceDescriptor !== undefined ? { faceDescriptor } : {}) });
     await this.auditService.log({
       userId: actorUserId,
       action: "WORKER_FACE_SET",
@@ -260,12 +260,12 @@ export class WorkersService {
     if (!worker || worker.status !== "ACTIVE" || worker.shopId !== shopId || !worker.facePhoto) {
       return null;
     }
-    return { facePhoto: worker.facePhoto };
+    return { facePhoto: worker.facePhoto, faceDescriptor: worker.faceDescriptor };
   }
 
   async removeFacePhoto(id: string, actorUserId?: string) {
     await this.ensureExists(id);
-    await this.repository.update(id, { facePhoto: null, facePhotoSetAt: null });
+    await this.repository.update(id, { facePhoto: null, facePhotoSetAt: null, faceDescriptor: null });
     await this.auditService.log({
       userId: actorUserId,
       action: "WORKER_FACE_REMOVED",
