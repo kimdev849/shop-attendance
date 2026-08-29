@@ -10,8 +10,8 @@ services:
     name: shop-attendance-api
     runtime: node
     region: frankfurt
-    buildCommand: npm run build:api
-    startCommand: node apps/api/dist/main.js
+    buildCommand: npm install && npm run build:api
+    startCommand: npm run start:prod --workspace=apps/api
     envVars:
       - key: NODE_ENV
         value: production
