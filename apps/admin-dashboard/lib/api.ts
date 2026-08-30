@@ -148,8 +148,8 @@ export const api = {
   devices: {
     list: (params?: Record<string, string | number | undefined>) => cachedGet("/devices", params),
     get: (id: string) => cachedGet(`/devices/${id}`),
-    create: (data: any) => { invalidateDomain("devices"); return apiClient.post("/devices", data); },
-    update: (id: string, data: any) => { invalidateDomain("devices"); return apiClient.patch(`/devices/${id}`, data); },
+    create: async (data: any) => { const res = await apiClient.post("/devices", data); invalidateDomain("devices"); return res; },
+    update: async (id: string, data: any) => { const res = await apiClient.patch(`/devices/${id}`, data); invalidateDomain("devices"); return res; },
   },
   users: {
     list: (params?: Record<string, string | number | undefined>) => cachedGet("/users", params),

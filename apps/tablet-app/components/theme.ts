@@ -1,23 +1,47 @@
 /**
- * Palette et espacements partagés par les écrans de la tablette. Volontairement
- * plus simple et plus contrastée que le dashboard admin: usage "kiosque",
- * lu rapidement par des utilisateurs debout, parfois avec une luminosité
- * ambiante forte (boutique).
+ * Palette StaffGo — refined dark theme for tablet kiosk.
  */
 export const theme = {
   colors: {
-    background: "#0F2A43",
-    surface: "#15385A",
-    surfaceAlt: "#1C4569",
-    primary: "#2FA592",
-    primaryDark: "#1F8574",
-    warning: "#E0A62F",
-    danger: "#D5573B",
-    success: "#2FA592",
-    text: "#F4F8FB",
-    textMuted: "#A9C0D4",
-    border: "#26507A",
+    background: "#0A1929",
+    surface: "#122A45",
+    surfaceAlt: "#1A3D68",
+    surfaceHighlight: "#1E4572",
+    primary: "#2563EB",
+    primaryDark: "#1D4ED8",
+    primaryLight: "#60A5FA",
+    accent: "#10B981",
+    accentLight: "#34D399",
+    warning: "#F59E0B",
+    danger: "#EF4444",
+    success: "#10B981",
+    text: "#F1F5F9",
+    textSecondary: "#CBD5E1",
+    textMuted: "#64748B",
+    border: "#1E3A5F",
+    borderLight: "#2A4A6B",
+    card: "#0F2340",
+    input: "#0D1F38",
+    gradient: ["#2563EB", "#1D4ED8"] as const,
+    gradientSuccess: ["#10B981", "#059669"] as const,
+    gradientDanger: ["#EF4444", "#DC2626"] as const,
   },
   spacing: (n: number) => n * 8,
   radius: 16,
+  radiusSm: 10,
+  radiusLg: 24,
+  shadow: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  } as const,
+  shadowLg: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 12,
+  } as const,
 };

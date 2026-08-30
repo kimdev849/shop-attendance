@@ -1,4 +1,12 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
+import { useRef } from "react";
+import {
+  ActivityIndicator,
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { theme } from "./theme";
 
 export function PrimaryButton({
@@ -7,29 +15,78 @@ export function PrimaryButton({
   loading,
   disabled,
   variant = "primary",
+  icon,
+  fullWidth,
 }: {
   label: string;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "danger" | "success";
+  icon?: React.ReactNode;
+  fullWidth?: boolean;
 }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scale, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const isDisabled = disabled || loading;
+
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled || loading}
-      style={({ pressed }) => [
-        styles.button,
-        variant === "secondary" && styles.secondary,
-        (disabled || loading) && styles.disabled,
-        pressed && styles.pressed,
-      ]}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={isDisabled}
     >
-      {loading ? (
-        <ActivityIndicator color={theme.colors.text} />
-      ) : (
-        <Text style={styles.label}>{label}</Text>
-      )}
+      <Animated.View
+        style={[
+          styles.button,
+          variant === "secondary" && styles.secondary,
+          variant === "danger" && styles.danger,
+          variant === "success" && styles.success,
+          isDisabled && styles.disabled,
+          fullWidth && styles.fullWidth,
+          { transform: [{ scale }] },
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator
+            color={variant === "secondary" ? theme.colors.textMuted : "#fff"}
+            size="small"
+          />
+        ) : (
+          <View style={styles.inner}>
+            {icon && <View style={styles.iconWrap}>{icon}</View>}
+            <Text
+              style={[
+                styles.label,
+                variant === "secondary" && styles.labelSecondary,
+                variant === "danger" && styles.labelDanger,
+                variant === "success" && styles.labelSuccess,
+              ]}
+            >
+              {label}
+            </Text>
+          </View>
+        )}
+      </Animated.View>
     </Pressable>
   );
 }
@@ -37,27 +94,54 @@ export function PrimaryButton({
 const styles = StyleSheet.create({
   button: {
     backgroundColor: theme.colors.primary,
-    paddingVertical: theme.spacing(2.5),
-    paddingHorizontal: theme.spacing(4),
-    borderRadius: theme.radius,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    minWidth: 240,
+    minHeight: 56,
+    ...theme.shadow,
+  },
+  fullWidth: {
+    width: "100%",
   },
   secondary: {
     backgroundColor: "transparent",
-    borderWidth: 2,
-    borderColor: theme.colors.border,
+    borderWidth: 1.5,
+    borderColor: theme.colors.borderLight,
+    shadowOpacity: 0,
+  },
+  danger: {
+    backgroundColor: theme.colors.danger,
+  },
+  success: {
+    backgroundColor: theme.colors.success,
   },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.4,
   },
-  pressed: {
-    opacity: 0.85,
+  inner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  iconWrap: {
+    marginRight: 2,
   },
   label: {
-    color: theme.colors.text,
-    fontSize: 20,
+    color: "#fff",
+    fontSize: 17,
     fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+  labelSecondary: {
+    color: theme.colors.textSecondary,
+  },
+  labelDanger: {
+    color: "#fff",
+  },
+  labelSuccess: {
+    color: "#fff",
   },
 });

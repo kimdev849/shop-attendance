@@ -1,18 +1,27 @@
 {
   "expo": {
-    "name": "ShopAttendance",
-    "slug": "shop-attendance-tablet",
+    "name": "StaffGo",
+    "slug": "staffgo",
     "version": "1.0.0",
-    "orientation": "landscape",
+    "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "scheme": "shopattendance",
+    "scheme": "staffgo",
     "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#0F2A43"
     },
     "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.staffgo.app",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "Autoriser StaffGo à utiliser Face ID pour confirmer votre identité."
+      }
+    },
     "android": {
-      "package": "com.shopattendance.tablet",
+      "package": "com.staffgo.app",
       "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT"],
       "adaptiveIcon": {
         "backgroundColor": "#0F2A43"

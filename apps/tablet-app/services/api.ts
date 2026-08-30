@@ -1,16 +1,32 @@
 import type { CheckInPayload, CheckInResult, SyncAttendanceResult } from "@shop-attendance/types";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3001";
-const TIMEOUT_MS = 8000;
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://shop-attendance-api.onrender.com";
+const TIMEOUT_MS = 30_000; // 30s – Render cold-start can take 30-60s
+const MAX_RETRIES = 2;
 
 async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    return await fetch(url, { ...options, signal: controller.signal });
-  } finally {
-    clearTimeout(timeout);
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      return res;
+    } catch (err: any) {
+      lastError = err;
+      // Only retry on network / abort errors (cold-start, timeout)
+      if (err?.name === "AbortError" || err?.message?.includes("Network")) {
+        // Wait before retrying (gives Render time to wake up)
+        await new Promise((r) => setTimeout(r, 3_000 * (attempt + 1)));
+        continue;
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
+  throw lastError;
 }
 
 export async function submitCheckIn(payload: CheckInPayload): Promise<CheckInResult> {

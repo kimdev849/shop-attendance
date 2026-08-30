@@ -1,7 +1,11 @@
-import { useEffect } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { CheckCircle2, Clock, CloudOff } from "lucide-react-native";
+import {
+  CheckCircle,
+  Clock,
+  CloudSlash,
+} from "phosphor-react-native";
 import { ScreenContainer } from "../components/screen-container";
 import { PrimaryButton } from "../components/primary-button";
 import { theme } from "../components/theme";
@@ -13,11 +17,37 @@ export default function ConfirmationScreen() {
   const router = useRouter();
   const { result, reset } = useCheckInFlow();
 
+  const iconScale = useRef(new Animated.Value(0)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardTranslateY = useRef(new Animated.Value(20)).current;
+
   useEffect(() => {
     if (!result) {
       router.replace("/");
       return;
     }
+
+    Animated.sequence([
+      Animated.spring(iconScale, {
+        toValue: 1,
+        tension: 60,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.parallel([
+        Animated.timing(cardOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardTranslateY, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+
     const timeout = setTimeout(() => {
       reset();
       router.replace("/");
@@ -29,59 +59,107 @@ export default function ConfirmationScreen() {
 
   const isLate = result.status === "LATE";
   const checkInTime = new Date(result.checkInTime);
-  const timeLabel = checkInTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+  const timeLabel = checkInTime.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
     <ScreenContainer>
-      <View
+      {/* Animated status icon */}
+      <Animated.View
         style={[
           styles.iconCircle,
-          { backgroundColor: isLate ? "rgba(224,166,47,0.15)" : "rgba(47,165,146,0.15)" },
+          {
+            backgroundColor: isLate
+              ? "rgba(245,158,11,0.08)"
+              : "rgba(16,185,129,0.08)",
+            borderColor: isLate
+              ? "rgba(245,158,11,0.2)"
+              : "rgba(16,185,129,0.2)",
+            transform: [{ scale: iconScale }],
+          },
         ]}
       >
         {isLate ? (
-          <Clock size={72} color={theme.colors.warning} />
+          <Clock size={48} color={theme.colors.warning} weight="fill" />
         ) : (
-          <CheckCircle2 size={72} color={theme.colors.success} />
+          <CheckCircle size={48} color={theme.colors.success} weight="fill" />
         )}
-      </View>
+      </Animated.View>
 
-      <Text style={styles.title}>Pointage enregistré</Text>
-      <Text style={styles.name}>{result.workerFullName}</Text>
+      <Text style={styles.title}>Pointage enregistre</Text>
 
-      <View style={{ height: theme.spacing(2) }} />
-      <Text style={styles.detail}>Arrivée : {timeLabel}</Text>
+      <Text style={styles.workerName}>{result.workerFullName}</Text>
 
-      <View style={{ height: theme.spacing(2) }} />
-      <Text style={[styles.status, { color: isLate ? theme.colors.warning : theme.colors.success }]}>
-        {isLate ? "EN RETARD" : "À L'HEURE"}
-      </Text>
+      {/* Info card */}
+      <Animated.View
+        style={[
+          styles.infoCard,
+          { opacity: cardOpacity, transform: [{ translateY: cardTranslateY }] },
+        ]}
+      >
+        <Text style={styles.infoLabel}>HEURE D'ARRIVEE</Text>
+        <Text style={styles.infoTime}>{timeLabel}</Text>
 
-      {isLate && result.latenessMinutes > 0 && (
-        <Text style={styles.detail}>Retard : {result.latenessMinutes} minute(s)</Text>
-      )}
+        <View style={styles.divider} />
+
+        <View
+          style={[
+            styles.statusBadge,
+            {
+              backgroundColor: isLate
+                ? "rgba(245,158,11,0.1)"
+                : "rgba(16,185,129,0.1)",
+              borderColor: isLate
+                ? "rgba(245,158,11,0.25)"
+                : "rgba(16,185,129,0.25)",
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.statusText,
+              {
+                color: isLate ? theme.colors.warning : theme.colors.success,
+              },
+            ]}
+          >
+            {isLate ? "EN RETARD" : "A L'HEURE"}
+          </Text>
+        </View>
+
+        {isLate && result.latenessMinutes > 0 && (
+          <Text style={styles.lateDetail}>
+            Retard : {result.latenessMinutes} min
+          </Text>
+        )}
+      </Animated.View>
 
       {isLate && result.penaltyAmount ? (
-        <View style={styles.penaltyBox}>
-          <Text style={styles.penaltyLabel}>Pénalité calculée</Text>
-          <Text style={styles.penaltyAmount}>{result.penaltyAmount.toLocaleString("fr-FR")} FCFA</Text>
+        <View style={styles.penaltyCard}>
+          <Text style={styles.penaltyLabel}>PENALITE CALCULEE</Text>
+          <Text style={styles.penaltyAmount}>
+            {result.penaltyAmount.toLocaleString("fr-FR")} FCFA
+          </Text>
           <Text style={styles.penaltyStatus}>En attente de validation</Text>
         </View>
       ) : null}
 
       {result.queuedOffline && (
         <View style={styles.offlineNotice}>
-          <CloudOff size={16} color={theme.colors.textMuted} />
+          <CloudSlash size={14} color={theme.colors.textMuted} weight="bold" />
           <Text style={styles.offlineText}>
-            Enregistré localement — sera synchronisé dès que la connexion sera rétablie.
+            Sera synchronise des la reconnexion
           </Text>
         </View>
       )}
 
-      <View style={{ height: theme.spacing(4) }} />
-      <Text style={styles.bye}>Bonne journée !</Text>
+      <View style={{ flex: 1 }} />
 
-      <View style={{ height: theme.spacing(4) }} />
+      <Text style={styles.bye}>Bonne journee</Text>
+
+      <View style={{ height: 14 }} />
       <PrimaryButton
         label="Terminer"
         variant="secondary"
@@ -89,6 +167,7 @@ export default function ConfirmationScreen() {
           reset();
           router.replace("/");
         }}
+        fullWidth
       />
     </ScreenContainer>
   );
@@ -96,71 +175,121 @@ export default function ConfirmationScreen() {
 
 const styles = StyleSheet.create({
   iconCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: theme.spacing(3),
+    borderWidth: 1.5,
+    marginBottom: 16,
   },
   title: {
     color: theme.colors.text,
     fontSize: 22,
-    fontWeight: "600",
-  },
-  name: {
-    color: theme.colors.text,
-    fontSize: 28,
     fontWeight: "700",
-    marginTop: theme.spacing(1),
+    textAlign: "center",
   },
-  detail: {
+  workerName: {
     color: theme.colors.textMuted,
-    fontSize: 16,
+    fontSize: 15,
+    marginTop: 6,
+    textAlign: "center",
   },
-  status: {
-    fontSize: 22,
+  infoCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radiusLg,
+    paddingVertical: 24,
+    paddingHorizontal: 32,
+    alignItems: "center",
+    width: "100%",
+    maxWidth: 360,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadow,
+  },
+  infoLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: "600",
+    letterSpacing: 1.5,
+  },
+  infoTime: {
+    color: theme.colors.text,
+    fontSize: 40,
+    fontWeight: "800",
+    marginTop: 6,
+  },
+  divider: {
+    width: 32,
+    height: 2,
+    backgroundColor: theme.colors.border,
+    marginVertical: 14,
+    borderRadius: 1,
+  },
+  statusBadge: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  statusText: {
+    fontSize: 14,
     fontWeight: "800",
     letterSpacing: 1,
   },
-  penaltyBox: {
-    marginTop: theme.spacing(2),
+  lateDetail: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    marginTop: 8,
+  },
+  penaltyCard: {
+    marginTop: 12,
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius,
-    paddingVertical: theme.spacing(2),
-    paddingHorizontal: theme.spacing(4),
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   penaltyLabel: {
     color: theme.colors.textMuted,
-    fontSize: 13,
+    fontSize: 12,
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
   penaltyAmount: {
     color: theme.colors.warning,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "700",
-    marginTop: 2,
+    marginTop: 4,
   },
   penaltyStatus: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 11,
+    marginTop: 4,
   },
   offlineNotice: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginTop: theme.spacing(2),
-    maxWidth: 380,
+    marginTop: 12,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   offlineText: {
     color: theme.colors.textMuted,
     fontSize: 12,
-    flexShrink: 1,
   },
   bye: {
     color: theme.colors.text,
-    fontSize: 18,
-    fontWeight: "300",
+    fontSize: 17,
+    fontWeight: "500",
+    textAlign: "center",
   },
 });

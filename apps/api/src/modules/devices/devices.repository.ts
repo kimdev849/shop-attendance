@@ -17,20 +17,27 @@ export class DevicesRepository {
     return this.prisma.device.findMany({ where: { shopId } });
   }
 
-  async findMany(params: { where?: any; orderBy?: any }) {
+  async count(where?: any) {
+    return this.prisma.device.count({ where });
+  }
+
+  async findMany(params: { where?: any; orderBy?: any; skip?: number; take?: number }) {
     return this.prisma.device.findMany({
       where: params.where,
       include: { shop: { select: { id: true, name: true, code: true } } },
       orderBy: params.orderBy ?? { createdAt: "desc" },
+      skip: params.skip,
+      take: params.take,
     });
   }
 
   async create(data: { name: string; shopId: string; serialNumber?: string; deviceIdentifier?: string }) {
+    const identifier = data.deviceIdentifier ?? data.serialNumber ?? `TAB-${Date.now().toString(36).toUpperCase()}`;
     return this.prisma.device.create({
       data: {
         name: data.name,
         shopId: data.shopId,
-        deviceIdentifier: data.deviceIdentifier ?? data.serialNumber ?? "unknown",
+        deviceIdentifier: identifier,
         status: "OFFLINE" as any,
       },
     });

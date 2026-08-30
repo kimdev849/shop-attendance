@@ -2,9 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsOptional, IsString, IsUUID } from "class-validator";
 
 export class CreateDeviceDto {
-  @ApiProperty({ description: "Identifiant unique matériel de la tablette (ex: numéro de série)" })
+  @ApiPropertyOptional({ description: "Identifiant unique matériel de la tablette (auto-généré si absent)" })
+  @IsOptional()
   @IsString()
-  deviceIdentifier: string;
+  deviceIdentifier?: string;
 
   @ApiProperty()
   @IsString()

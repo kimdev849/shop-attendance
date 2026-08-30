@@ -11,7 +11,7 @@
   "scripts": {
     "dev:api": "npm run start:dev --workspace=apps/api",
     "dev:dashboard": "npm run dev --workspace=apps/admin-dashboard",
-    "dev:tablet": "npm run start --workspace=apps/tablet-app",
+    "dev:tablet": "cd apps/tablet-app && npm run start",
     "build:api": "npm run prisma:generate --workspace=apps/api && npm run build --workspace=apps/api",
     "build:dashboard": "npm run build --workspace=apps/admin-dashboard",
     "db:migrate": "npm run prisma:migrate --workspace=apps/api",

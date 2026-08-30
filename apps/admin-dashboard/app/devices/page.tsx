@@ -19,8 +19,6 @@ import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 import { formatDateTime } from "@/lib/utils";
 
-const EMPTY_FORM = { deviceIdentifier: "", name: "", shopId: "", appVersion: "" };
-
 export default function DevicesPage() {
   const [result, setResult] = useState<any>(null);
   const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
@@ -28,11 +26,12 @@ export default function DevicesPage() {
   const [filterShop, setFilterShop] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editId, setEditId] = useState("");
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState({ name: "", shopId: "" });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
@@ -51,11 +50,10 @@ export default function DevicesPage() {
       });
       setResult(data);
     } finally { setLoading(false); }
-  }, [search, filterShop, page]);
+  }, [search, filterShop, page, refreshKey]);
 
   useEffect(() => {
     load();
-    return () => {};
   }, [load]);
 
   useEffect(() => { setPage(1); }, [search, filterShop]);
@@ -67,18 +65,18 @@ export default function DevicesPage() {
     setSaving(true);
     try {
       await api.devices.create(form);
-      toast("Tablette enregistrée.", "success");
+      toast("Tablette créée avec succès.", "success");
       setCreateOpen(false);
-      setForm(EMPTY_FORM);
-      load();
+      setForm({ name: "", shopId: "" });
+      setRefreshKey((k) => k + 1);
     } catch (err: any) {
-      toast(err?.response?.data?.message ?? "Erreur.", "error");
+      toast(err?.response?.data?.message ?? "Erreur lors de la création.", "error");
     } finally { setSaving(false); }
   }
 
   function openEdit(d: any) {
     setEditId(d.id);
-    setForm({ deviceIdentifier: d.deviceIdentifier, name: d.name, shopId: d.shopId ?? d.shop?.id ?? "", appVersion: d.appVersion ?? "" });
+    setForm({ name: d.name, shopId: d.shopId ?? d.shop?.id ?? "" });
     setEditOpen(true);
   }
 
@@ -88,8 +86,8 @@ export default function DevicesPage() {
       await api.devices.update(editId, { name: form.name, shopId: form.shopId });
       toast("Tablette modifiée.", "success");
       setEditOpen(false);
-      setForm(EMPTY_FORM);
-      load();
+      setForm({ name: "", shopId: "" });
+      setRefreshKey((k) => k + 1);
     } catch (err: any) {
       toast(err?.response?.data?.message ?? "Erreur.", "error");
     } finally { setSaving(false); }
@@ -113,7 +111,7 @@ export default function DevicesPage() {
             <Button variant="ghost" size="sm" onClick={resetFilters}><RotateCcw className="h-3.5 w-3.5" /> Réinitialiser</Button>
           )}
         </div>
-        <Button onClick={() => { setForm(EMPTY_FORM); setCreateOpen(true); }}>
+        <Button onClick={() => { setForm({ name: "", shopId: "" }); setCreateOpen(true); }}>
           <Plus className="h-4 w-4" /> Nouvelle tablette
         </Button>
       </div>
@@ -123,7 +121,13 @@ export default function DevicesPage() {
           {loading ? (
             <TableSkeleton rows={6} columns={6} />
           ) : devices.length === 0 ? (
-            <EmptyState icon={<Tablet className="h-10 w-10" />} message="Aucune tablette enregistrée." onReset={hasFilters ? resetFilters : undefined} actionLabel={!hasFilters ? "Enregistrer une tablette" : undefined} onAction={!hasFilters ? () => setCreateOpen(true) : undefined} />
+            <EmptyState
+              icon={<Tablet className="h-10 w-10" />}
+              message={hasFilters ? "Aucun résultat pour ces filtres." : "Aucune tablette enregistrée."}
+              onReset={hasFilters ? resetFilters : undefined}
+              actionLabel={!hasFilters ? "Enregistrer une tablette" : undefined}
+              onAction={!hasFilters ? () => setCreateOpen(true) : undefined}
+            />
           ) : (
             <>
               <Table>
@@ -168,17 +172,29 @@ export default function DevicesPage() {
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Enregistrer une tablette">
         <div className="space-y-4">
-          <div className="space-y-1.5"><Label>Identifiant matériel *</Label><Input value={form.deviceIdentifier} onChange={(e) => setForm({ ...form, deviceIdentifier: e.target.value })} placeholder="N° de série" /></div>
-          <div className="space-y-1.5"><Label>Nom *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Tablette Caisse 1" /></div>
-          <div className="space-y-1.5"><Label>Shop *</Label>
+          <div className="space-y-1.5">
+            <Label>Nom de la tablette *</Label>
+            <Input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Ex: Tablette Caisse 1"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Shop *</Label>
             <Select value={form.shopId} onChange={(e) => setForm({ ...form, shopId: e.target.value })}>
-              <option value="">— Sélectionner —</option>
+              <option value="">— Sélectionner un shop —</option>
               {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </Select>
           </div>
+          <p className="text-xs text-muted-foreground">
+            L&apos;identifiant matériel sera automatiquement généré.
+          </p>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button>
-            <Button onClick={handleCreate} disabled={saving || !form.deviceIdentifier || !form.name || !form.shopId}>{saving ? "Enregistrement..." : "Créer"}</Button>
+            <Button onClick={handleCreate} disabled={saving || !form.name || !form.shopId}>
+              {saving ? "Création..." : "Créer la tablette"}
+            </Button>
           </div>
         </div>
       </Modal>
