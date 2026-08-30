@@ -20,6 +20,11 @@ export class DevicesController {
     return this.devicesService.create(dto);
   }
 
+  @Post(":id/heartbeat")
+  heartbeat(@Param("id") id: string) {
+    return this.devicesService.heartbeat(id);
+  }
+
   @Get()
   @Roles(UserRole.ADMIN, UserRole.SHOP_MANAGER)
   findAll(

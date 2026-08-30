@@ -107,6 +107,23 @@ export async function getFacePhotoForCheckIn(employeeNumber: string, shopId: str
   return response.json();
 }
 
+// ── Heartbeat ───────────────────────────────────────────────────────
+
+/**
+ * Send a heartbeat to the server to report this device is alive.
+ * Called every 60s from _layout.tsx.
+ */
+export async function sendHeartbeat(deviceId: string) {
+  try {
+    await fetchWithTimeout(`${API_URL}/v1/devices/${deviceId}/heartbeat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch {
+    // Silent fail — heartbeat is best-effort
+  }
+}
+
 // ── Setup: Shops & Device Registration ─────────────────────────────
 
 export interface ShopSummary {

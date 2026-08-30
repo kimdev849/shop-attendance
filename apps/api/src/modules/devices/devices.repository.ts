@@ -50,7 +50,29 @@ export class DevicesRepository {
   async touchLastSeen(id: string) {
     return this.prisma.device.update({
       where: { id },
-      data: { lastSyncAt: new Date(), status: "ONLINE" as any },
+      data: { lastSyncAt: new Date(), lastHeartbeatAt: new Date(), status: "ONLINE" as any },
+    });
+  }
+
+  async heartbeat(id: string) {
+    return this.prisma.device.update({
+      where: { id },
+      data: { lastHeartbeatAt: new Date(), status: "ONLINE" as any },
+    });
+  }
+
+  /**
+   * Mark devices as OFFLINE if no heartbeat received in the last 5 minutes.
+   * Called periodically or before listing devices.
+   */
+  async markStaleDevicesOffline() {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+    return this.prisma.device.updateMany({
+      where: {
+        status: "ONLINE",
+        lastHeartbeatAt: { lt: fiveMinAgo },
+      },
+      data: { status: "INACTIVE" as any },
     });
   }
 }

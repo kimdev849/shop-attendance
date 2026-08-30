@@ -8,7 +8,7 @@ import { CheckInFlowProvider } from "./flow-context";
 import { theme } from "../components/theme";
 import { flushQueue } from "../services/sync-manager";
 import { subscribeToConnectivity, isOnline } from "../services/network";
-import { fetchWorkerRoster } from "../services/api";
+import { fetchWorkerRoster, sendHeartbeat } from "../services/api";
 import { getDeviceConfig } from "../storage/device-config";
 import { setCachedRoster } from "../storage/worker-cache";
 
@@ -32,10 +32,16 @@ export default function RootLayout() {
     flushQueue().catch(() => {});
     refreshRosterCache();
 
-    // Sync periodique toutes les 60s
+    // Heartbeat + sync periodique toutes les 60s
     intervalRef.current = setInterval(() => {
       flushQueue().catch(() => {});
       refreshRosterCache();
+      // Send heartbeat to report device is alive
+      getDeviceConfig().then((config) => {
+        if (config?.deviceId) {
+          sendHeartbeat(config.deviceId).catch(() => {});
+        }
+      });
     }, 60_000);
 
     // Ecoute la connectivité réseau
@@ -52,11 +58,16 @@ export default function RootLayout() {
     }
 
     // Re-sync quand l'app revient au premier plan
-    const appStateSub = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        flushQueue().catch(() => {});
-        refreshRosterCache();
-      }
+    const appStateSub = AppState.addEventListener("change", (state) => {      if (state === "active") {
+          flushQueue().catch(() => {});
+          refreshRosterCache();
+          // Send heartbeat when app comes to foreground
+          getDeviceConfig().then((config) => {
+            if (config?.deviceId) {
+              sendHeartbeat(config.deviceId).catch(() => {});
+            }
+          });
+        }
     });
 
     return () => {

@@ -12,6 +12,9 @@ export class DevicesService {
   }
 
   async findAll(params?: string | { search?: string; shopId?: string; status?: string; page?: number; limit?: number }) {
+    // Auto-mark stale devices before listing
+    await this.repository.markStaleDevicesOffline();
+
     if (typeof params === "string") {
       return this.repository.findMany({ where: { shopId: params } });
     }
@@ -31,7 +34,14 @@ export class DevicesService {
       this.repository.count(where),
     ]);
 
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+    // Compute isStale for each device (no heartbeat in 5 min)
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const enriched = data.map((d: any) => ({
+      ...d,
+      isStale: d.status === "ONLINE" && (!d.lastHeartbeatAt || d.lastHeartbeatAt < fiveMinAgo),
+    }));
+
+    return { data: enriched, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: string) {
@@ -47,6 +57,10 @@ export class DevicesService {
 
   async touch(id: string) {
     return this.repository.touchLastSeen(id);
+  }
+
+  async heartbeat(id: string) {
+    return this.repository.heartbeat(id);
   }
 
   private async ensureExists(id: string) {

@@ -169,6 +169,7 @@ model Device {
   shopId           String
   shop             Shop         @relation(fields: [shopId], references: [id])
   lastSyncAt       DateTime?
+  lastHeartbeatAt  DateTime?    // Dernier ping reçu de la tablette
   appVersion       String?
   status           DeviceStatus @default(OFFLINE)
   createdAt        DateTime     @default(now())
@@ -178,6 +179,7 @@ model Device {
 
   @@index([shopId])
   @@index([status])
+  @@index([lastHeartbeatAt])
   @@map("devices")
 }
 

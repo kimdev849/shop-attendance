@@ -137,7 +137,7 @@ export default function DevicesPage() {
                     <TableHead>Identifiant</TableHead>
                     <TableHead>Shop</TableHead>
                     <TableHead>Statut</TableHead>
-                    <TableHead>Dernière synchro</TableHead>
+                    <TableHead>Dernière activité</TableHead>
                     <TableHead>Alerte</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -149,7 +149,7 @@ export default function DevicesPage() {
                       <TableCell className="font-mono text-xs text-muted-foreground">{d.deviceIdentifier}</TableCell>
                       <TableCell>{d.shop?.name ?? "—"}</TableCell>
                       <TableCell><StatusBadge status={d.status} /></TableCell>
-                      <TableCell className="text-xs">{d.lastSyncAt ? formatDateTime(d.lastSyncAt) : "Jamais"}</TableCell>
+                      <TableCell className="text-xs">{d.lastHeartbeatAt ? formatDateTime(d.lastHeartbeatAt) : d.lastSyncAt ? formatDateTime(d.lastSyncAt) : "Jamais"}</TableCell>
                       <TableCell>
                         {d.isStale && (
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-warning">
