@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@ne
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { ShopStatus, UserRole } from "@prisma/client";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { Public } from "../../common/decorators/public.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { CreateShopDto } from "./dto/create-shop.dto";
@@ -19,6 +20,25 @@ export class ShopsController {
   @Roles(UserRole.ADMIN)
   create(@Body() dto: CreateShopDto, @CurrentUser("userId") userId: string) {
     return this.shopsService.create(dto, userId);
+  }
+
+  /**
+   * Public endpoint for tablet initial setup — no auth required.
+   * Returns a lightweight list of active shops.
+   */
+  @Public()
+  @Get("list")
+  findPublicList(
+    @Query("search") search?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.shopsService.findAll({
+      search,
+      status: ShopStatus.ACTIVE,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get()

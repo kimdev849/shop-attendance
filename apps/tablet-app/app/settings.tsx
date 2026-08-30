@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Keyboard,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -11,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   GearSix,
   FloppyDisk,
@@ -22,6 +24,8 @@ import {
   CheckCircle,
   Storefront,
   X,
+  WarningCircle,
+  WifiSlash,
 } from "phosphor-react-native";
 import { ScreenContainer } from "../components/screen-container";
 import { PrimaryButton } from "../components/primary-button";
@@ -34,9 +38,11 @@ import {
 import { queueSize } from "../storage/attendance-queue";
 import { flushQueue } from "../services/sync-manager";
 import { fetchShops, registerDevice, ShopSummary } from "../services/api";
+import { isOnline } from "../services/network";
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   // ── Device config state ────────────────────────────────────────
   const [existingConfig, setExistingConfig] = useState<DeviceConfig | null>(null);
@@ -52,17 +58,16 @@ export default function SettingsScreen() {
   const [selectedShop, setSelectedShop] = useState<ShopSummary | null>(null);
   const [shopDropdownOpen, setShopDropdownOpen] = useState(false);
   const [loadingShops, setLoadingShops] = useState(false);
-  const [shopPage, setShopPage] = useState(1);
-  const [hasMoreShops, setHasMoreShops] = useState(true);
+  const [shopError, setShopError] = useState("");
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
 
   // Load existing config on mount
   useEffect(() => {
     getDeviceConfig().then((config) => {
-      if (config) {
+      if (config && mountedRef.current) {
         setExistingConfig(config);
         setDeviceName(config.deviceName);
-        // Restore selected shop if available
         if (config.shopId && config.shopName) {
           setSelectedShop({
             id: config.shopId,
@@ -74,43 +79,53 @@ export default function SettingsScreen() {
       }
     });
     queueSize().then(setPending);
+    return () => { mountedRef.current = false; };
   }, []);
 
   // ── Shop search ────────────────────────────────────────────────
 
-  const loadShops = useCallback(async (search: string, page: number, append = false) => {
+  const loadShops = useCallback(async (search: string) => {
     setLoadingShops(true);
+    setShopError("");
     try {
-      const result = await fetchShops(search || undefined, page, 30);
-      if (append) {
-        setShops((prev) => [...prev, ...result.data]);
-      } else {
-        setShops(result.data);
+      const online = await isOnline();
+      if (!online) {
+        setShopError("Pas de connexion internet. Vérifiez votre réseau.");
+        setShops([]);
+        return;
       }
-      setHasMoreShops(page < result.totalPages);
+      const result = await fetchShops(search || undefined, 1, 50);
+      setShops(result.data ?? []);
+      if ((result.data ?? []).length === 0) {
+        setShopError(search ? "Aucun point de vente ne correspond à votre recherche." : "Aucun point de vente actif trouvé.");
+      }
     } catch {
-      // Silently fail — user can retry
+      setShopError("Impossible de charger les points de vente. Vérifiez votre connexion.");
+      setShops([]);
     } finally {
       setLoadingShops(false);
     }
   }, []);
 
-  // Initial load
-  useEffect(() => {
-    loadShops("", 1);
-  }, [loadShops]);
-
-  // Debounced search
+  // Debounced search — only triggers when user types
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
-      setShopPage(1);
-      loadShops(shopSearch, 1);
+      loadShops(shopSearch);
     }, 400);
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
   }, [shopSearch, loadShops]);
+
+  function handleOpenDropdown() {
+    setShopDropdownOpen(true);
+    setShopError("");
+    // Load all shops on first open if not yet loaded
+    if (shops.length === 0 && !loadingShops) {
+      loadShops("");
+    }
+  }
 
   function handleSelectShop(shop: ShopSummary) {
     setSelectedShop(shop);
@@ -124,36 +139,29 @@ export default function SettingsScreen() {
     setShopSearch("");
   }
 
-  function loadMoreShops() {
-    if (loadingShops || !hasMoreShops) return;
-    const nextPage = shopPage + 1;
-    setShopPage(nextPage);
-    loadShops(shopSearch, nextPage, true);
-  }
-
   // ── Save ───────────────────────────────────────────────────────
+
+  const canSave = selectedShop && deviceName.trim().length > 0 && !saving && !saved;
 
   async function handleSave() {
     setError("");
 
     if (!selectedShop) {
-      setError("Veuillez sélectionner un shop.");
+      setError("Sélectionnez un point de vente.");
       return;
     }
     if (!deviceName.trim()) {
-      setError("Veuillez entrer un nom pour cette tablette.");
+      setError("Donnez un nom à cette tablette.");
       return;
     }
 
     setSaving(true);
     try {
-      // Register device with the server (auto-generates deviceIdentifier)
       const device = await registerDevice({
         name: deviceName.trim(),
         shopId: selectedShop.id,
       });
 
-      // Save config locally
       const config: DeviceConfig = {
         apiUrl: process.env.EXPO_PUBLIC_API_URL ?? "https://shop-attendance-api.onrender.com",
         shopId: selectedShop.id,
@@ -166,7 +174,7 @@ export default function SettingsScreen() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: any) {
-      setError(err?.message ?? "Erreur lors de l'enregistrement. Vérifiez votre connexion.");
+      setError(err?.message ?? "Erreur lors de l'enregistrement.");
     } finally {
       setSaving(false);
     }
@@ -181,20 +189,18 @@ export default function SettingsScreen() {
         style={[styles.shopItem, isSelected && styles.shopItemSelected]}
         onPress={() => handleSelectShop(item)}
       >
-        <View style={styles.shopItemLeft}>
-          <Storefront size={16} color={isSelected ? theme.colors.primary : theme.colors.textMuted} weight="bold" />
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.shopItemName, isSelected && styles.shopItemNameSelected]}>
-              {item.name}
-            </Text>
-            {item.city && (
-              <Text style={styles.shopItemCity}>{item.city}</Text>
-            )}
-          </View>
+        <Storefront
+          size={15}
+          color={isSelected ? theme.colors.primary : theme.colors.textMuted}
+          weight="bold"
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.shopItemName, isSelected && { color: theme.colors.primary }]}>
+            {item.name}
+          </Text>
+          {item.city ? <Text style={styles.shopItemMeta}>{item.city}</Text> : null}
         </View>
-        {isSelected && (
-          <CheckCircle size={18} color={theme.colors.primary} weight="fill" />
-        )}
+        {isSelected && <CheckCircle size={16} color={theme.colors.primary} weight="fill" />}
       </Pressable>
     );
   }
@@ -202,7 +208,7 @@ export default function SettingsScreen() {
   return (
     <ScreenContainer>
       <Pressable style={styles.backButton} onPress={() => router.replace("/")}>
-        <ArrowLeft size={20} color={theme.colors.textMuted} weight="bold" />
+        <ArrowLeft size={18} color={theme.colors.textSecondary} weight="bold" />
         <Text style={styles.backText}>Accueil</Text>
       </Pressable>
 
@@ -212,109 +218,95 @@ export default function SettingsScreen() {
           renderItem={null}
           keyExtractor={() => "empty"}
           ListHeaderComponent={
-            <View style={styles.inner}>
+            <View style={[styles.inner, { paddingBottom: insets.bottom + 40 }]}>
               {/* Header */}
               <View style={styles.header}>
                 <View style={styles.iconCircle}>
-                  <GearSix size={22} color={theme.colors.primaryLight} weight="bold" />
+                  <GearSix size={20} color={theme.colors.primary} weight="bold" />
                 </View>
                 <Text style={styles.title}>Configuration</Text>
                 <Text style={styles.subtitle}>
-                  Sélectionnez le shop et donnez un nom à cette tablette.{"\n"}
-                  L'identifiant est automatiquement généré.
+                  Sélectionnez un point de vente{"\n"}et donnez un nom à cette tablette.
                 </Text>
               </View>
 
               {/* ── Shop selector ─────────────────────────────── */}
-              <View style={styles.sectionLabel}>
-                <Storefront size={14} color={theme.colors.textMuted} weight="bold" />
-                <Text style={styles.sectionLabelText}>Point de vente</Text>
-              </View>
+              <Text style={styles.label}>Point de vente</Text>
 
-              <View style={styles.card}>
-                {selectedShop ? (
-                  <View style={styles.selectedShopCard}>
-                    <View style={styles.selectedShopInfo}>
-                      <Storefront size={20} color={theme.colors.primary} weight="bold" />
-                      <View>
-                        <Text style={styles.selectedShopName}>{selectedShop.name}</Text>
-                        {selectedShop.city && (
-                          <Text style={styles.selectedShopCity}>{selectedShop.city}</Text>
-                        )}
-                      </View>
+              {selectedShop ? (
+                <View style={styles.selectedShopCard}>
+                  <View style={styles.selectedShopRow}>
+                    <Storefront size={18} color={theme.colors.primary} weight="bold" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.selectedShopName}>{selectedShop.name}</Text>
+                      {selectedShop.city ? (
+                        <Text style={styles.selectedShopMeta}>{selectedShop.city}</Text>
+                      ) : null}
                     </View>
-                    <Pressable onPress={handleClearShop} style={styles.clearButton}>
-                      <X size={16} color={theme.colors.textMuted} weight="bold" />
-                    </Pressable>
                   </View>
-                ) : (
-                  <>
-                    {/* Search input */}
-                    <View style={styles.searchRow}>
-                      <MagnifyingGlass size={16} color={theme.colors.textMuted} weight="bold" />
-                      <TextInput
-                        style={styles.searchInput}
-                        placeholder="Rechercher un shop..."
-                        placeholderTextColor={theme.colors.textMuted}
-                        value={shopSearch}
-                        onChangeText={setShopSearch}
-                        onFocus={() => setShopDropdownOpen(true)}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                    </View>
-
-                    {/* Dropdown */}
-                    {shopDropdownOpen && (
-                      <View style={styles.dropdown}>
-                        <FlatList
-                          data={shops}
-                          renderItem={renderShopItem}
-                          keyExtractor={(item) => item.id}
-                          style={styles.dropdownList}
-                          keyboardShouldPersistTaps="handled"
-                          ListEmptyComponent={
-                            loadingShops ? (
-                              <View style={styles.dropdownLoading}>
-                                <ActivityIndicator size="small" color={theme.colors.primary} />
-                                <Text style={styles.dropdownLoadingText}>Chargement...</Text>
-                              </View>
-                            ) : (
-                              <Text style={styles.dropdownEmpty}>Aucun shop trouvé</Text>
-                            )
-                          }
-                          ListFooterComponent={
-                            hasMoreShops && shops.length > 0 ? (
-                              <Pressable onPress={loadMoreShops} style={styles.loadMoreBtn}>
-                                {loadingShops ? (
-                                  <ActivityIndicator size="small" color={theme.colors.primary} />
-                                ) : (
-                                  <Text style={styles.loadMoreText}>Charger plus</Text>
-                                )}
-                              </Pressable>
-                            ) : null
-                          }
-                          onEndReached={loadMoreShops}
-                          onEndReachedThreshold={0.5}
-                        />
-                        <Pressable
-                          style={styles.dropdownClose}
-                          onPress={() => setShopDropdownOpen(false)}
-                        >
-                          <Text style={styles.dropdownCloseText}>Fermer</Text>
-                        </Pressable>
-                      </View>
+                  <Pressable onPress={handleClearShop} style={styles.clearBtn}>
+                    <X size={14} color={theme.colors.textSecondary} weight="bold" />
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={styles.selectorWrap}>
+                  {/* Search input */}
+                  <View style={styles.searchRow}>
+                    <MagnifyingGlass size={15} color={theme.colors.textMuted} weight="bold" />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Rechercher un point de vente..."
+                      placeholderTextColor={theme.colors.textMuted}
+                      value={shopSearch}
+                      onChangeText={setShopSearch}
+                      onFocus={handleOpenDropdown}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    {loadingShops && (
+                      <ActivityIndicator size="small" color={theme.colors.primary} />
                     )}
-                  </>
-                )}
-              </View>
+                  </View>
+
+                  {/* Dropdown */}
+                  {shopDropdownOpen && (
+                    <View style={styles.dropdown}>
+                      <FlatList
+                        data={shops}
+                        renderItem={renderShopItem}
+                        keyExtractor={(item) => item.id}
+                        style={styles.dropdownList}
+                        keyboardShouldPersistTaps="handled"
+                        ListEmptyComponent={
+                          loadingShops ? (
+                            <View style={styles.dropdownMsg}>
+                              <ActivityIndicator size="small" color={theme.colors.primary} />
+                              <Text style={styles.dropdownMsgText}>Recherche...</Text>
+                            </View>
+                          ) : shopError ? (
+                            <View style={styles.dropdownMsg}>
+                              {shopError.includes("connexion") || shopError.includes("réseau") ? (
+                                <WifiSlash size={14} color={theme.colors.warning} weight="bold" />
+                              ) : (
+                                <WarningCircle size={14} color={theme.colors.textMuted} weight="bold" />
+                              )}
+                              <Text style={[styles.dropdownMsgText, shopError.includes("connexion") && { color: theme.colors.warning }]}>
+                                {shopError}
+                              </Text>
+                            </View>
+                          ) : null
+                        }
+                      />
+                      <Pressable style={styles.dropdownClose} onPress={() => setShopDropdownOpen(false)}>
+                        <Text style={styles.dropdownCloseText}>Fermer</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+              )}
 
               {/* ── Device name ───────────────────────────────── */}
-              <View style={[styles.sectionLabel, { marginTop: 20 }]}>
-                <DeviceMobile size={14} color={theme.colors.textMuted} weight="bold" />
-                <Text style={styles.sectionLabelText}>Nom de la tablette</Text>
-              </View>
-
+              <Text style={[styles.label, { marginTop: 20 }]}>Nom de la tablette</Text>
               <View style={styles.card}>
                 <TextInput
                   style={styles.input}
@@ -325,14 +317,12 @@ export default function SettingsScreen() {
                   autoCapitalize="words"
                   autoCorrect={false}
                 />
-                <Text style={styles.fieldHint}>
-                  Un nom unique pour identifier cette tablette
-                </Text>
               </View>
 
               {/* ── Error ─────────────────────────────────────── */}
               {error ? (
                 <View style={styles.errorBox}>
+                  <WarningCircle size={14} color="#ef4444" weight="bold" />
                   <Text style={styles.errorText}>{error}</Text>
                 </View>
               ) : null}
@@ -342,7 +332,7 @@ export default function SettingsScreen() {
               <PrimaryButton
                 label={saved ? "Enregistré !" : saving ? "Enregistrement..." : existingConfig ? "Mettre à jour" : "Enregistrer"}
                 onPress={handleSave}
-                disabled={saving || saved}
+                disabled={!canSave}
                 icon={saved ? <CheckCircle size={18} color="#fff" weight="bold" /> : <FloppyDisk size={18} color="#fff" weight="bold" />}
                 fullWidth
               />
@@ -350,46 +340,30 @@ export default function SettingsScreen() {
               {/* ── Sync section ──────────────────────────────── */}
               {existingConfig && (
                 <>
-                  <View style={[styles.sectionLabel, { marginTop: 24 }]}>
-                    <ArrowsClockwise size={14} color={theme.colors.textMuted} weight="bold" />
-                    <Text style={styles.sectionLabelText}>Synchronisation</Text>
-                  </View>
-
+                  <Text style={[styles.label, { marginTop: 24 }]}>Synchronisation</Text>
                   <View style={styles.card}>
                     <View style={styles.syncRow}>
-                      <View>
+                      <View style={{ flex: 1 }}>
                         <Text style={styles.syncTitle}>File d'attente</Text>
-                        <Text style={styles.syncSubtitle}>
+                        <Text style={styles.syncMeta}>
                           {pending} pointage(s) en attente
                         </Text>
                       </View>
-                      <View
-                        style={[
-                          styles.syncBadge,
-                          pending > 0 && styles.syncBadgeActive,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.syncBadgeText,
-                            pending > 0 && styles.syncBadgeTextActive,
-                          ]}
-                        >
+                      <View style={[styles.syncBadge, pending > 0 && styles.syncBadgeActive]}>
+                        <Text style={[styles.syncBadgeText, pending > 0 && styles.syncBadgeTextActive]}>
                           {pending}
                         </Text>
                       </View>
                     </View>
                     <View style={{ height: 12 }} />
                     <PrimaryButton
-                      label="Synchroniser maintenant"
+                      label="Synchroniser"
                       variant="secondary"
                       onPress={async () => {
                         await flushQueue();
                         setPending(await queueSize());
                       }}
-                      icon={
-                        <ArrowsClockwise size={16} color={theme.colors.textSecondary} weight="bold" />
-                      }
+                      icon={<ArrowsClockwise size={15} color={theme.colors.textSecondary} weight="bold" />}
                       fullWidth
                     />
                   </View>
@@ -401,13 +375,9 @@ export default function SettingsScreen() {
                 label="Retour à l'accueil"
                 variant="secondary"
                 onPress={() => router.replace("/")}
-                icon={
-                  <House size={16} color={theme.colors.textSecondary} weight="bold" />
-                }
+                icon={<House size={15} color={theme.colors.textSecondary} weight="bold" />}
                 fullWidth
               />
-
-              <View style={{ height: 40 }} />
             </View>
           }
           showsVerticalScrollIndicator={false}
@@ -430,28 +400,25 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   backText: {
-    color: theme.colors.textMuted,
+    color: theme.colors.textSecondary,
     fontSize: 14,
   },
   inner: {
     width: "100%",
     maxWidth: 420,
     paddingTop: 50,
-    paddingBottom: 40,
   },
   header: {
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 28,
   },
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: theme.colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
     marginBottom: 12,
   },
   title: {
@@ -460,41 +427,32 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   subtitle: {
-    color: theme.colors.textMuted,
+    color: theme.colors.textSecondary,
     fontSize: 13,
     textAlign: "center",
     marginTop: 8,
-    lineHeight: 18,
-    paddingHorizontal: 16,
+    lineHeight: 19,
   },
-  sectionLabel: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 10,
-    marginLeft: 4,
-  },
-  sectionLabelText: {
-    color: theme.colors.textMuted,
-    fontSize: 12,
+  label: {
+    color: theme.colors.textSecondary,
+    fontSize: 13,
     fontWeight: "600",
-    letterSpacing: 0.5,
-    textTransform: "uppercase",
+    marginBottom: 8,
   },
   card: {
     backgroundColor: theme.colors.surface,
-    borderRadius: theme.radius,
-    padding: 16,
+    borderRadius: 12,
+    padding: 14,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    ...theme.shadow,
   },
   // ── Shop selector ──────────────────────────────
+  selectorWrap: {},
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.input,
-    borderRadius: 10,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: theme.colors.border,
     paddingHorizontal: 12,
@@ -502,108 +460,80 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 13,
     fontSize: 14,
     color: theme.colors.text,
   },
   dropdown: {
-    marginTop: 8,
-    backgroundColor: theme.colors.surfaceAlt,
-    borderRadius: 10,
+    marginTop: 6,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    maxHeight: 240,
+    maxHeight: 220,
     overflow: "hidden",
   },
   dropdownList: {
-    maxHeight: 200,
+    maxHeight: 180,
   },
   shopItem: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
+    gap: 10,
+    paddingVertical: 11,
     paddingHorizontal: 14,
-    borderBottomWidth: 1,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.border,
   },
   shopItemSelected: {
-    backgroundColor: `${theme.colors.primary}15`,
-  },
-  shopItemLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
+    backgroundColor: `${theme.colors.primary}10`,
   },
   shopItemName: {
     color: theme.colors.text,
     fontSize: 14,
     fontWeight: "500",
   },
-  shopItemNameSelected: {
-    color: theme.colors.primary,
-    fontWeight: "600",
-  },
-  shopItemCity: {
+  shopItemMeta: {
     color: theme.colors.textMuted,
     fontSize: 12,
-    marginTop: 2,
+    marginTop: 1,
   },
-  dropdownLoading: {
+  dropdownMsg: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     gap: 8,
-    paddingVertical: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
   },
-  dropdownLoadingText: {
+  dropdownMsgText: {
     color: theme.colors.textMuted,
     fontSize: 13,
-  },
-  dropdownEmpty: {
-    color: theme.colors.textMuted,
-    fontSize: 13,
-    textAlign: "center",
-    paddingVertical: 16,
-  },
-  loadMoreBtn: {
-    paddingVertical: 10,
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  loadMoreText: {
-    color: theme.colors.primary,
-    fontSize: 13,
-    fontWeight: "600",
+    flex: 1,
   },
   dropdownClose: {
-    paddingVertical: 10,
+    paddingVertical: 8,
     alignItems: "center",
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.border,
   },
   dropdownCloseText: {
     color: theme.colors.textMuted,
-    fontSize: 13,
-    fontWeight: "500",
+    fontSize: 12,
   },
   // ── Selected shop ──────────────────────────────
   selectedShopCard: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: `${theme.colors.primary}10`,
-    borderRadius: 10,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: `${theme.colors.primary}30`,
+    borderColor: `${theme.colors.primary}40`,
   },
-  selectedShopInfo: {
+  selectedShopRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 10,
     flex: 1,
   },
   selectedShopName: {
@@ -611,15 +541,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
   },
-  selectedShopCity: {
+  selectedShopMeta: {
     color: theme.colors.textMuted,
     fontSize: 12,
-    marginTop: 2,
+    marginTop: 1,
   },
-  clearButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  clearBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: theme.colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
@@ -635,24 +565,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: theme.colors.text,
   },
-  fieldHint: {
-    color: theme.colors.textMuted,
-    fontSize: 11,
-    marginTop: 6,
-  },
   // ── Error ──────────────────────────────────────
   errorBox: {
     marginTop: 12,
-    backgroundColor: "rgba(239,68,68,0.1)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(239,68,68,0.08)",
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.2)",
+    borderColor: "rgba(239,68,68,0.15)",
   },
   errorText: {
     color: "#ef4444",
     fontSize: 13,
-    textAlign: "center",
+    flex: 1,
   },
   // ── Sync ───────────────────────────────────────
   syncRow: {
@@ -665,28 +593,25 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
   },
-  syncSubtitle: {
-    color: theme.colors.textMuted,
+  syncMeta: {
+    color: theme.colors.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
   syncBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: theme.colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   syncBadgeActive: {
     backgroundColor: "rgba(245,158,11,0.15)",
-    borderColor: "rgba(245,158,11,0.3)",
   },
   syncBadgeText: {
     color: theme.colors.textMuted,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
   },
   syncBadgeTextActive: {

@@ -145,7 +145,8 @@ export async function fetchShops(search?: string, page = 1, limit = 50) {
   params.set("limit", String(limit));
   params.set("status", "ACTIVE"); // Only show active shops
 
-  const response = await fetchWithTimeout(`${API_URL}/v1/shops?${params.toString()}`, {
+  // Use public endpoint (no auth required for initial tablet setup)
+  const response = await fetchWithTimeout(`${API_URL}/v1/shops/list?${params.toString()}`, {
     method: "GET",
   });
 
