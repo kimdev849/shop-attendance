@@ -48,6 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("sa_access_token", data.accessToken);
     localStorage.setItem("sa_refresh_token", data.refreshToken);
     localStorage.setItem("sa_user", JSON.stringify(data.user));
+    // Also set a cookie so Next.js middleware can detect auth server-side
+    document.cookie = `sa_access_token=${data.accessToken}; path=/; max-age=86400; SameSite=Lax`;
     setUser(data.user);
     setIsLoading(false);
     router.push("/dashboard");
@@ -57,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("sa_access_token");
     localStorage.removeItem("sa_refresh_token");
     localStorage.removeItem("sa_user");
+    document.cookie = "sa_access_token=; path=/; max-age=0";
     setUser(null);
     setIsLoading(false);
     router.push("/login");

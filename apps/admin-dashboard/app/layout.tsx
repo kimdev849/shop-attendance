@@ -5,6 +5,10 @@ import { Providers } from "./providers";
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
+      <head>
+        {/* Preconnect to API to reduce cold-start latency */}
+        <link rel="preconnect" href="https://shop-attendance-api.onrender.com" />
+      </head>
       <body className="font-sans antialiased">
         <Providers>{children}</Providers>
       </body>

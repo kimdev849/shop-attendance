@@ -40,20 +40,28 @@ function StatCard({ icon: Icon, label, value, accent, href }: {
   return href ? <Link href={href}>{content}</Link> : content;
 }
 
-function DashboardSkeleton() {
+function DashboardSkeleton({ isSlow }: { isSlow?: boolean }) {
   return (
-    <div className="space-y-4 animate-pulse sm:space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 sm:gap-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Card key={i}><CardContent className="flex items-center justify-between p-4">
-            <div className="space-y-2"><div className="h-2.5 w-16 rounded bg-muted-foreground/10" /><div className="h-6 w-10 rounded bg-muted-foreground/15" /></div>
-            <div className="h-10 w-10 rounded-xl bg-muted-foreground/10" />
-          </CardContent></Card>
-        ))}
-      </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 sm:gap-4">
-        <Card><CardContent className="h-64" /></Card>
-        <Card><CardContent className="h-64" /></Card>
+    <div className="space-y-4 sm:space-y-6">
+      {isSlow && (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+          <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <span>Le serveur se réveille, cela peut prendre quelques secondes...</span>
+        </div>
+      )}
+      <div className="space-y-4 animate-pulse sm:space-y-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 sm:gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}><CardContent className="flex items-center justify-between p-4">
+              <div className="space-y-2"><div className="h-2.5 w-16 rounded bg-muted-foreground/10" /><div className="h-6 w-10 rounded bg-muted-foreground/15" /></div>
+              <div className="h-10 w-10 rounded-xl bg-muted-foreground/10" />
+            </CardContent></Card>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 sm:gap-4">
+          <Card><CardContent className="h-64" /></Card>
+          <Card><CardContent className="h-64" /></Card>
+        </div>
       </div>
     </div>
   );
@@ -65,6 +73,13 @@ export default function DashboardPage() {
   const [shopDistribution, setShopDistribution] = useState<ShopDistributionPoint[]>([]);
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSlow, setIsSlow] = useState(false);
+
+  useEffect(() => {
+    // Show "warming" hint after 5s (Render cold start)
+    const timer = setTimeout(() => setIsSlow(true), 5000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -84,7 +99,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell title="Tableau de bord">
-      {loading || !stats ? <DashboardSkeleton /> : (
+      {loading || !stats ? <DashboardSkeleton isSlow={isSlow} /> : (
         <div className="space-y-4 sm:space-y-6">
           {/* Stats — 2 cols on mobile, 3 on sm, 6 on lg */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 sm:gap-4">
