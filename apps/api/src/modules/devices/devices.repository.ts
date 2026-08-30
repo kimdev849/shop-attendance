@@ -70,9 +70,9 @@ export class DevicesRepository {
     return this.prisma.device.updateMany({
       where: {
         status: "ONLINE",
-        lastHeartbeatAt: { lt: fiveMinAgo },
+        lastHeartbeatAt: { not: null, lt: fiveMinAgo },
       },
-      data: { status: "INACTIVE" as any },
+      data: { status: "OFFLINE" as any },
     });
   }
 }

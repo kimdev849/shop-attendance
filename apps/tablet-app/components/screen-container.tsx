@@ -6,9 +6,11 @@ import { theme } from "./theme";
 export function ScreenContainer({
   children,
   style,
+  center = true,
 }: {
   children: ReactNode;
   style?: any;
+  center?: boolean;
 }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(12)).current;
@@ -32,7 +34,7 @@ export function ScreenContainer({
     <SafeAreaView style={styles.safe}>
       <Animated.View
         style={[
-          styles.container,
+          center ? styles.container : styles.containerStretch,
           style,
           { opacity, transform: [{ translateY }] },
         ]}
@@ -52,7 +54,12 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
     paddingVertical: 24,
+  },
+  containerStretch: {
+    flex: 1,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
 });

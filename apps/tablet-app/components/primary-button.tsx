@@ -106,9 +106,9 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   secondary: {
-    backgroundColor: "transparent",
-    borderWidth: 1.5,
-    borderColor: theme.colors.borderLight,
+    backgroundColor: theme.colors.surface,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
     shadowOpacity: 0,
   },
   danger: {
