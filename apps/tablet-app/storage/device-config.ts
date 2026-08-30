@@ -2,15 +2,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /**
  * Configuration locale de l'appareil (appairage tablette <-> shop).
- * Un administrateur doit renseigner ces valeurs une seule fois via l'écran
- * "Paramètres" avant la première utilisation (voir README §"Biométrie" et
- * "Configuration de la tablette" pour la procédure complète).
+ * L'admin configure le shop et le nom via l'écran Paramètres.
+ * L'identifiant matériel (deviceIdentifier) est auto-généré par le serveur.
  */
 export interface DeviceConfig {
   apiUrl: string;
   shopId: string;
   deviceId: string;
   deviceName: string;
+  shopName: string;
 }
 
 const STORAGE_KEY = "@shopattendance/device-config";

@@ -85,10 +85,9 @@ export default function HomeScreen() {
           <View style={styles.setupIconCircle}>
             <ShieldCheck size={32} color={theme.colors.primary} weight="bold" />
           </View>
-          <Text style={styles.setupTitle}>Tablette non configuree</Text>
+          <Text style={styles.setupTitle}>Tablette non configurée</Text>
           <Text style={styles.setupSubtitle}>
-            Renseignez le shop et l'identifiant{"\n"}de cet appareil avant la
-            premiere utilisation.
+            Sélectionnez le shop et donnez un nom{"\n"}à cette tablette pour commencer.
           </Text>
           <View style={{ height: 24 }} />
           <PrimaryButton
@@ -131,7 +130,7 @@ export default function HomeScreen() {
         ]}
       >
         <Text style={styles.shopLabel}>POINT DE VENTE</Text>
-        <Text style={styles.shopName}>{config.deviceName}</Text>
+        <Text style={styles.shopName}>{config.shopName || config.deviceName}</Text>
         <View style={styles.divider} />
         <Text style={styles.clock}>
           {now.toLocaleDateString("fr-FR", {

@@ -15,9 +15,7 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
       return res;
     } catch (err: any) {
       lastError = err;
-      // Only retry on network / abort errors (cold-start, timeout)
       if (err?.name === "AbortError" || err?.message?.includes("Network")) {
-        // Wait before retrying (gives Render time to wake up)
         await new Promise((r) => setTimeout(r, 3_000 * (attempt + 1)));
         continue;
       }
@@ -28,6 +26,8 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
   }
   throw lastError;
 }
+
+// ── Check-in / Attendance ──────────────────────────────────────────
 
 export async function submitCheckIn(payload: CheckInPayload): Promise<CheckInResult> {
   const response = await fetchWithTimeout(`${API_URL}/v1/attendance/check-in`, {
@@ -61,7 +61,8 @@ export async function syncAttendanceBatch(
   return response.json();
 }
 
-/** Récupère le roster complet (travailleurs actifs) d'un shop, pour rafraîchir le cache local hors ligne. */
+// ── Workers ────────────────────────────────────────────────────────
+
 export async function fetchWorkerRoster(shopId: string) {
   const response = await fetchWithTimeout(
     `${API_URL}/v1/workers/roster?${new URLSearchParams({ shopId }).toString()}`,
@@ -104,4 +105,67 @@ export async function getFacePhotoForCheckIn(employeeNumber: string, shopId: str
   });
   if (!response.ok) return null;
   return response.json();
+}
+
+// ── Setup: Shops & Device Registration ─────────────────────────────
+
+export interface ShopSummary {
+  id: string;
+  name: string;
+  code: string;
+  city?: string;
+  status: string;
+}
+
+/**
+ * Fetch shops list (paginated, with search).
+ * Used by the settings screen to populate the shop selector.
+ */
+export async function fetchShops(search?: string, page = 1, limit = 50) {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  params.set("page", String(page));
+  params.set("limit", String(limit));
+  params.set("status", "ACTIVE"); // Only show active shops
+
+  const response = await fetchWithTimeout(`${API_URL}/v1/shops?${params.toString()}`, {
+    method: "GET",
+  });
+
+  if (!response.ok) throw new Error("Impossible de récupérer la liste des shops.");
+  return response.json() as Promise<{
+    data: ShopSummary[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }>;
+}
+
+/**
+ * Register this tablet with the server.
+ * Returns the created/updated device with its auto-generated deviceIdentifier.
+ */
+export async function registerDevice(payload: {
+  deviceIdentifier?: string;
+  name: string;
+  shopId: string;
+}) {
+  const response = await fetchWithTimeout(`${API_URL}/v1/devices`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message ?? `Erreur lors de l'enregistrement (${response.status})`);
+  }
+
+  return response.json() as Promise<{
+    id: string;
+    deviceIdentifier: string;
+    name: string;
+    shopId: string;
+    status: string;
+  }>;
 }
