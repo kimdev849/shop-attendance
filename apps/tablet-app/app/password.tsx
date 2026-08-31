@@ -40,10 +40,17 @@ export default function PasswordScreen() {
         return;
       }
 
-      await verifyWorkerPin(worker.employeeNumber, config.shopId, pin);
+      await verifyWorkerPin(worker.employeeNumber, config.shopId, pin.trim());
       router.push("/biometry");
     } catch (err: any) {
-      setError(err?.message ?? "Mot de passe incorrect.");
+      const msg = err?.message ?? "Mot de passe incorrect.";
+      if (msg.includes("Aucun mot de passe")) {
+        setError("Aucun code PIN n'a été défini. Contactez votre responsable pour en créer un.");
+      } else if (msg.includes("incorrect")) {
+        setError("Code PIN incorrect. Réessayez ou contactez votre responsable.");
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -89,9 +96,9 @@ export default function PasswordScreen() {
         <LockSimple size={26} color={theme.colors.primaryLight} weight="bold" />
       </View>
 
-      <Text style={styles.title}>Mot de passe</Text>
+      <Text style={styles.title}>Code PIN</Text>
       <Text style={styles.subtitle}>
-        Entrez votre code PIN pour confirmer
+        Entrez votre code personnel pour confirmer votre pointage
       </Text>
 
       <View style={{ height: 24 }} />
