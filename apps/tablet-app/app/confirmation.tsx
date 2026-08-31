@@ -58,31 +58,33 @@ export default function ConfirmationScreen() {
   if (!result) return null;
 
   const isLate = result.status === "LATE";
-  const isCheckOut = result.type === "CHECK_OUT";
+  const isCheckOut = (result as any).type === "CHECK_OUT";
   const checkInTime = new Date(result.checkInTime);
   const timeLabel = checkInTime.toLocaleTimeString("fr-FR", {
     hour: "2-digit",
     minute: "2-digit",
   });
-  const checkOutTime = result.checkOutTime ? new Date(result.checkOutTime) : null;
-  const checkOutLabel = checkOutTime?.toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }) ?? null;
+  const checkOutTimeRaw = (result as any).checkOutTime;
+  const checkOutTime = checkOutTimeRaw ? new Date(checkOutTimeRaw) : null;
+  const checkOutLabel = checkOutTime
+    ? checkOutTime.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  const displayTime = isCheckOut && checkOutLabel ? checkOutLabel : timeLabel;
+  const statusColor = isLate ? theme.colors.warning : theme.colors.success;
+  const statusBg = isLate ? "rgba(245,158,11,0.1)" : "rgba(16,185,129,0.1)";
+  const statusBorder = isLate ? "rgba(245,158,11,0.25)" : "rgba(16,185,129,0.25)";
+  const iconBg = isLate ? "rgba(245,158,11,0.08)" : "rgba(16,185,129,0.08)";
+  const iconBorder = isLate ? "rgba(245,158,11,0.2)" : "rgba(16,185,129,0.2)";
 
   return (
     <ScreenContainer>
-      {/* Animated status icon */}
       <Animated.View
         style={[
           styles.iconCircle,
           {
-            backgroundColor: isLate
-              ? "rgba(245,158,11,0.08)"
-              : "rgba(16,185,129,0.08)",
-            borderColor: isLate
-              ? "rgba(245,158,11,0.2)"
-              : "rgba(16,185,129,0.2)",
+            backgroundColor: iconBg,
+            borderColor: iconBorder,
             transform: [{ scale: iconScale }],
           },
         ]}
@@ -94,50 +96,34 @@ export default function ConfirmationScreen() {
         )}
       </Animated.View>
 
-      <Text style={styles.title}>{isCheckOut ? "Sortie enregistree" : "Pointage enregistre"}</Text>
+      <Text style={styles.title}>
+        {isCheckOut ? "Sortie enregistree" : "Pointage enregistre"}
+      </Text>
 
       <Text style={styles.workerName}>{result.workerFullName}</Text>
 
-      {/* Info card */}
       <Animated.View
         style={[
           styles.infoCard,
           { opacity: cardOpacity, transform: [{ translateY: cardTranslateY }] },
         ]}
       >
-        <Text style={styles.infoLabel}>{isCheckOut ? "HEURE DE SORTIE" : "HEURE D'ARRIVEE"}</Text>
-        <Text style={styles.infoTime}>{isCheckOut && checkOutLabel ? checkOutLabel : timeLabel}</Text>
+        <Text style={styles.infoLabel}>
+          {isCheckOut ? "HEURE DE SORTIE" : "HEURE D'ARRIVEE"}
+        </Text>
+        <Text style={styles.infoTime}>{displayTime}</Text>
 
         <View style={styles.divider} />
 
-        <View
-          style={[
-            styles.statusBadge,
-            {
-              backgroundColor: isLate
-                ? "rgba(245,158,11,0.1)"
-                : "rgba(16,185,129,0.1)",
-              borderColor: isLate
-                ? "rgba(245,158,11,0.25)"
-                : "rgba(16,185,129,0.25)",
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.statusText,
-              {
-                color: isLate ? theme.colors.warning : theme.colors.success,
-              },
-            ]}
-          >
+        <View style={[styles.statusBadge, { backgroundColor: statusBg, borderColor: statusBorder }]}>
+          <Text style={[styles.statusText, { color: statusColor }]}>
             {isLate ? "EN RETARD" : "A L'HEURE"}
           </Text>
         </View>
 
         {isLate && result.latenessMinutes > 0 && (
           <Text style={styles.lateDetail}>
-            Retard : {result.latenessMinutes} min
+            {"Retard : " + result.latenessMinutes + " min"}
           </Text>
         )}
       </Animated.View>
@@ -146,24 +132,28 @@ export default function ConfirmationScreen() {
         <View style={styles.penaltyCard}>
           <Text style={styles.penaltyLabel}>PENALITE CALCULEE</Text>
           <Text style={styles.penaltyAmount}>
-            {result.penaltyAmount.toLocaleString("fr-FR")} FCFA
+            {result.penaltyAmount.toLocaleString("fr-FR") + " FCFA"}
           </Text>
           <Text style={styles.penaltyStatus}>En attente de validation</Text>
         </View>
       ) : null}
 
-      {result.queuedOffline && (
+      {result.queuedOffline ? (
         <View style={styles.offlineNotice}>
           <CloudSlash size={14} color={theme.colors.textMuted} weight="bold" />
           <Text style={styles.offlineText}>
             Sera synchronise des la reconnexion
           </Text>
         </View>
-      )}
+      ) : null}
 
-      <View style={{ flex: 1 }} />        <Text style={styles.bye}>{isCheckOut ? "Bonne soiree" : "Bonne journee"}</Text>
+      <View style={styles.spacer} />
 
-      <View style={{ height: 14 }} />
+      <Text style={styles.bye}>
+        {isCheckOut ? "Bonne soiree" : "Bonne journee"}
+      </Text>
+
+      <View style={styles.bottomGap} />
       <PrimaryButton
         label="Terminer"
         variant="secondary"
@@ -296,4 +286,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     textAlign: "center",
   },
+  spacer: { flex: 1 },
+  bottomGap: { height: 14 },
 });
