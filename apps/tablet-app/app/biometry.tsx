@@ -38,7 +38,11 @@ export default function BiometryScreen() {
   const [attendanceType, setAttendanceType] = useState<"CHECK_IN" | "CHECK_OUT">("CHECK_IN");
 
   useEffect(() => {
-    if (!worker) { router.replace("/identification"); return; }
+    if (!worker) {
+      // Defer navigation to avoid "navigate before mounting" error
+      const t = setTimeout(() => router.replace("/identification"), 100);
+      return () => clearTimeout(t);
+    }
     initScreen();
   }, [worker]);
 

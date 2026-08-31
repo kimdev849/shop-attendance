@@ -23,8 +23,8 @@ export default function ConfirmationScreen() {
 
   useEffect(() => {
     if (!result) {
-      router.replace("/");
-      return;
+      const t = setTimeout(() => router.replace("/"), 100);
+      return () => clearTimeout(t);
     }
 
     Animated.sequence([
