@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Store, Users, CheckCircle2, Clock, CalendarX, Banknote, ArrowRight } from "lucide-react";
+import { Store, Users, Tablet, CheckCircle2, Clock, CalendarX, Banknote, ArrowRight } from "lucide-react";
 import { AppShell } from "@/components/layout/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { AttendanceTrendChart, TrendPoint } from "@/components/charts/attendance-trend-chart";
 import { ShopDistributionChart, ShopDistributionPoint } from "@/components/charts/shop-distribution-chart";
 import { api } from "@/lib/api";
@@ -14,6 +15,7 @@ import { formatFcfa, formatDateTime } from "@/lib/utils";
 interface Stats {
   totalShops: number;
   totalWorkers: number;
+  totalDevices: number;
   presentToday: number;
   lateToday: number;
   absentToday: number;
@@ -42,15 +44,14 @@ function StatCard({ icon: Icon, label, value, accent, href }: {
 
 function DashboardSkeleton({ isSlow }: { isSlow?: boolean }) {
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {isSlow && (
+    <div className="space-y-4 sm:space-y-6">        {isSlow && (
         <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <span>Le serveur se réveille, cela peut prendre quelques secondes...</span>
         </div>
       )}
       <div className="space-y-4 animate-pulse sm:space-y-6">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 sm:gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <Card key={i}><CardContent className="flex items-center justify-between p-4">
               <div className="space-y-2"><div className="h-2.5 w-16 rounded bg-muted-foreground/10" /><div className="h-6 w-10 rounded bg-muted-foreground/15" /></div>
@@ -74,6 +75,7 @@ export default function DashboardPage() {
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSlow, setIsSlow] = useState(false);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   useEffect(() => {
     // Show "warming" hint after 5s (Render cold start)
@@ -81,30 +83,42 @@ export default function DashboardPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  async function load() {
+    try {
+      const [statsRes, trendRes, shopRes, logsRes] = await Promise.all([
+        api.dashboard.stats(), api.dashboard.dailyTrend(14),
+        api.dashboard.attendanceByShop(), api.auditLogs.list({ limit: 6 }),
+      ]);
+      setStats(statsRes.data);
+      setTrend(trendRes.data);
+      setShopDistribution(shopRes.data.map((s: any) => ({ shopName: s.shopName, present: s.present, late: s.late, absent: s.absent })));
+      setRecentLogs((logsRes.data.data ?? logsRes.data).slice(0, 6));
+    } catch (err: any) {
+      setDashboardError(err?.response?.data?.message ?? "Le serveur est indisponible. Réessayez dans quelques instants.");
+    } finally { setLoading(false); }
+  }
+
   useEffect(() => {
-    async function load() {
-      try {
-        const [statsRes, trendRes, shopRes, logsRes] = await Promise.all([
-          api.dashboard.stats(), api.dashboard.dailyTrend(14),
-          api.dashboard.attendanceByShop(), api.auditLogs.list({ limit: 6 }),
-        ]);
-        setStats(statsRes.data);
-        setTrend(trendRes.data);
-        setShopDistribution(shopRes.data.map((s: any) => ({ shopName: s.shopName, present: s.present, late: s.late, absent: s.absent })));
-        setRecentLogs((logsRes.data.data ?? logsRes.data).slice(0, 6));
-      } finally { setLoading(false); }
-    }
     load();
   }, []);
 
   return (
     <AppShell title="Tableau de bord">
-      {loading || !stats ? <DashboardSkeleton isSlow={isSlow} /> : (
+      {(loading || !stats) && !dashboardError ? <DashboardSkeleton isSlow={isSlow} /> : dashboardError ? (
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+          <p className="text-sm font-medium text-destructive">Erreur de chargement</p>
+          <p className="text-xs text-muted-foreground">{dashboardError}</p>
+          <Button variant="outline" size="sm" onClick={() => { setLoading(true); setDashboardError(null); load(); }}>
+            Réessayer
+          </Button>
+        </div>
+      ) : (
         <div className="space-y-4 sm:space-y-6">
           {/* Stats — 2 cols on mobile, 3 on sm, 6 on lg */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 sm:gap-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:gap-4">
             <StatCard icon={Store} label="Shops" value={stats.totalShops} accent="222 84% 40%" href="/shops" />
             <StatCard icon={Users} label="Workers" value={stats.totalWorkers} accent="262 83% 58%" href="/workers" />
+            <StatCard icon={Tablet} label="Tablettes" value={stats.totalDevices} accent="200 90% 50%" href="/devices" />
             <StatCard icon={CheckCircle2} label="Présents" value={stats.presentToday} accent="152 69% 31%" href="/attendance" />
             <StatCard icon={Clock} label="Retards" value={stats.lateToday} accent="38 92% 50%" href="/attendance" />
             <StatCard icon={CalendarX} label="Absents" value={stats.absentToday} accent="0 84% 60%" href="/absences" />

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { UserRole } from "@prisma/client";
+import { Public } from "../../common/decorators/public.decorator";
 import { Roles } from "../../common/decorators/roles.decorator";
 import { RolesGuard } from "../../common/guards/roles.guard";
 import { CreateDeviceDto } from "./dto/create-device.dto";
@@ -14,12 +15,13 @@ import { DevicesService } from "./devices.service";
 export class DevicesController {
   constructor(private readonly devicesService: DevicesService) {}
 
+  @Public()
   @Post()
-  @Roles(UserRole.ADMIN)
   create(@Body() dto: CreateDeviceDto) {
     return this.devicesService.create(dto);
   }
 
+  @Public()
   @Post(":id/heartbeat")
   heartbeat(@Param("id") id: string) {
     return this.devicesService.heartbeat(id);

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 
 /**
@@ -7,6 +7,8 @@ import { PrismaService } from "../../prisma/prisma.service";
  */
 @Injectable()
 export class DevicesRepository {
+  private readonly logger = new Logger(DevicesRepository.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async findById(id: string) {
@@ -66,13 +68,18 @@ export class DevicesRepository {
    * Called periodically or before listing devices.
    */
   async markStaleDevicesOffline() {
-    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-    return this.prisma.device.updateMany({
-      where: {
-        status: "ONLINE",
-        lastHeartbeatAt: { not: null, lt: fiveMinAgo },
-      },
-      data: { status: "OFFLINE" as any },
-    });
+    try {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      return await this.prisma.device.updateMany({
+        where: {
+          status: "ONLINE" as any,
+          lastHeartbeatAt: { not: null, lt: fiveMinAgo },
+        },
+        data: { status: "OFFLINE" as any },
+      });
+    } catch (err: any) {
+      this.logger.warn(`markStaleDevicesOffline failed: ${err?.message}`);
+      // Non-fatal: proceed without marking stale devices
+    }
   }
 }

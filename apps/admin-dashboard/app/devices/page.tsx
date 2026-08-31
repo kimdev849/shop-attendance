@@ -27,6 +27,7 @@ export default function DevicesPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -41,6 +42,7 @@ export default function DevicesPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const { data } = await api.devices.list({
         search: search || undefined,
@@ -49,6 +51,8 @@ export default function DevicesPage() {
         limit: 15,
       });
       setResult(data);
+    } catch (err: any) {
+      setLoadError(err?.response?.data?.message ?? "Le serveur est indisponible. Réessayez.");
     } finally { setLoading(false); }
   }, [search, filterShop, page, refreshKey]);
 
@@ -120,6 +124,15 @@ export default function DevicesPage() {
         <CardContent className="p-0">
           {loading ? (
             <TableSkeleton rows={6} columns={6} />
+          ) : loadError ? (
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <AlertTriangle className="h-10 w-10 text-destructive" />
+              <p className="text-sm font-medium text-destructive">Erreur de chargement</p>
+              <p className="text-xs text-muted-foreground">{loadError}</p>
+              <Button variant="outline" size="sm" onClick={() => { setLoading(true); setLoadError(null); load(); }}>
+                <RotateCcw className="h-3.5 w-3.5" /> Réessayer
+              </Button>
+            </div>
           ) : devices.length === 0 ? (
             <EmptyState
               icon={<Tablet className="h-10 w-10" />}

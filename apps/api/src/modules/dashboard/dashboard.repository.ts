@@ -46,4 +46,8 @@ export class DashboardRepository {
     });
     return result._sum.amount ?? 0;
   }
+
+  async countDevices() {
+    return this.prisma.device.count();
+  }
 }
