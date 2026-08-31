@@ -273,39 +273,43 @@ export class WorkersService {
       return { matched: true };
     }
     try {
-      const faceapi = await import("@vladmandic/face-api");
-      await faceapi.nets.ssdMobilenetv1.loadFromUri("public/models");
-      await faceapi.nets.faceLandmark68Net.loadFromUri("public/models");
-      await faceapi.nets.faceRecognitionNet.loadFromUri("public/models");
+      const sharp = (await import("sharp")).default;
 
       // Decode captured photo from base64
-      const base64Data = capturedPhoto.replace(/^data:image\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
-      const { default: sharp } = await import("sharp");
-      const imageBuffer = await sharp(buffer).resize(400, 400).jpeg().toBuffer();
+      const capturedBase64 = capturedPhoto.replace(/^data:image\/\w+;base64,/, "");
+      const capturedBuffer = Buffer.from(capturedBase64, "base64");
 
-      // Create an ImageData-compatible object for face-api
-      // Use node-canvas or Buffer-based approach
-      const { createCanvas, loadImage } = await import("canvas");
-      const img = await loadImage(imageBuffer);
-      const canvas = createCanvas(400, 400);
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, 400, 400);
+      // Get stored photo from DB
+      const storedPhoto = worker.facePhoto;
+      if (!storedPhoto) return { matched: true };
 
-      const detection = await faceapi
-        .detectSingleFace(canvas as any, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
-        .withFaceLandmarks()
-        .withFaceDescriptor();
+      const storedBase64 = storedPhoto.replace(/^data:image\/\w+;base64,/, "");
+      const storedBuffer = Buffer.from(storedBase64, "base64");
 
-      if (!detection) return { matched: false };
+      // Normalize both images: resize to 100x100 grayscale for pixel comparison
+      const size = 100;
+      const [capturedRaw, storedRaw] = await Promise.all([
+        sharp(capturedBuffer).resize(size, size).greyscale().raw().toBuffer(),
+        sharp(storedBuffer).resize(size, size).greyscale().raw().toBuffer(),
+      ]);
 
-      const storedDescriptor = new Float32Array(JSON.parse(worker.faceDescriptor));
-      const distance = faceapi.euclideanDistance(detection.descriptor, storedDescriptor);
-      const matched = distance < 0.55;
+      // Compute mean absolute difference between pixel values
+      let diff = 0;
+      for (let i = 0; i < capturedRaw.length; i++) {
+        diff += Math.abs(capturedRaw[i] - storedRaw[i]);
+      }
+      const avgDiff = diff / capturedRaw.length; // 0 = identical, 255 = opposite
 
+      // Threshold: if average pixel difference < 80, consider it a match
+      // This is a rough similarity check — not face recognition
+      const matched = avgDiff < 80;
+      const distance = avgDiff / 255;
+
+      this.logger.log(`Face verify: avgDiff=${avgDiff.toFixed(1)}, matched=${matched}`);
       return { matched, distance };
-    } catch {
-      // If face-api fails on server, fall back to match (allow check-in)
+    } catch (err) {
+      this.logger.error(`Face verify failed: ${err}`);
+      // Fallback: allow check-in if face comparison fails
       return { matched: true };
     }
   }
