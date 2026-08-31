@@ -184,15 +184,12 @@ export default function WorkersPage() {
       const descriptor = await extractFaceDescriptor(img);
       if (descriptor) {
         setFaceStatus("detected");
-        // Store descriptor temporarily
         (window as any).__faceDescriptor = serializeDescriptor(descriptor);
       } else {
         setFaceStatus("no-face");
-        toast("Aucun visage détecté. Réessayez.", "info");
       }
     } catch {
       setFaceStatus("error");
-      toast("Erreur lors de la détection faciale.", "error");
     }
   }
 
@@ -206,8 +203,8 @@ export default function WorkersPage() {
 
   async function handleSaveFacePhoto() {
     if (!faceTarget || !capturedPhoto) return;
-    if (faceStatus === "no-face") {
-      toast("Impossible d'enregistrer sans visage détecté. Reprenez la photo.", "error");
+    if (faceStatus !== "detected") {
+      toast("Un visage doit être détecté pour enregistrer. Reprenez la photo.", "error");
       return;
     }
     setSaving(true);
@@ -397,11 +394,31 @@ export default function WorkersPage() {
             <div className="text-center">
               <p className="mb-2 text-xs font-medium text-muted-foreground">Photo capturée :</p>
               <img src={capturedPhoto} alt="Captured" className="mx-auto h-36 w-36 rounded-xl object-cover border-2 border-green-500" />
-              <div className="mt-2">
-                {faceStatus === "detecting" && <p className="text-xs text-primary animate-pulse">🔍 Détection du visage en cours…</p>}
-                {faceStatus === "detected" && <p className="text-xs text-green-600 font-medium">✅ Visage détecté — descripteur extrait (128 features)</p>}
-                {faceStatus === "no-face" && <p className="text-xs text-amber-600">⚠️ Aucun visage détecté — la photo sera enregistrée sans descripteur</p>}
-                {faceStatus === "error" && <p className="text-xs text-destructive">❌ Erreur de détection</p>}
+              <div className="mt-3">
+                {faceStatus === "detecting" && (
+                  <div className="flex items-center justify-center gap-2 rounded-lg bg-primary/5 border border-primary/20 p-3">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    <span className="text-xs font-medium text-primary">Analyse du visage en cours…</span>
+                  </div>
+                )}
+                {faceStatus === "detected" && (
+                  <div className="flex items-center justify-center gap-2 rounded-lg bg-green-50 border border-green-200 p-3">
+                    <span className="text-green-600 text-sm">✅</span>
+                    <span className="text-xs font-medium text-green-700">Visage détecté — photo prête à enregistrer</span>
+                  </div>
+                )}
+                {faceStatus === "no-face" && (
+                  <div className="flex items-center justify-center gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3">
+                    <span className="text-amber-600 text-sm">⚠️</span>
+                    <span className="text-xs font-medium text-amber-700">Aucun visage trouvé — reprenez la photo en face</span>
+                  </div>
+                )}
+                {faceStatus === "error" && (
+                  <div className="flex items-center justify-center gap-2 rounded-lg bg-red-50 border border-red-200 p-3">
+                    <span className="text-red-600 text-sm">❌</span>
+                    <span className="text-xs font-medium text-red-700">Erreur lors de la détection — réessayez</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -422,7 +439,7 @@ export default function WorkersPage() {
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { setFaceTarget(null); stopCamera(); }}>Fermer</Button>
               {capturedPhoto && (
-                <Button onClick={handleSaveFacePhoto} disabled={saving}>
+                <Button onClick={handleSaveFacePhoto} disabled={saving || faceStatus !== "detected"}>
                   {saving ? "Enregistrement..." : "Enregistrer"}
                 </Button>
               )}

@@ -8,6 +8,7 @@
 
 let faceapi: typeof import("@vladmandic/face-api") | null = null;
 let modelsLoaded = false;
+let modelsLoading: Promise<void> | null = null;
 
 async function ensureFaceApi() {
   if (faceapi) return faceapi;
@@ -15,14 +16,24 @@ async function ensureFaceApi() {
   return faceapi;
 }
 
-/** Charge les modèles face-api.js (une seule fois). */
+/** Charge les modèles face-api.js (une seule fois, avec debounce). */
 export async function loadFaceModels(): Promise<void> {
   if (modelsLoaded) return;
-  const fapi = await ensureFaceApi();
-  await fapi.nets.ssdMobilenetv1.loadFromUri("/models");
-  await fapi.nets.faceLandmark68Net.loadFromUri("/models");
-  await fapi.nets.faceRecognitionNet.loadFromUri("/models");
-  modelsLoaded = true;
+  if (modelsLoading) return modelsLoading;
+  modelsLoading = (async () => {
+    const fapi = await ensureFaceApi();
+    await fapi.nets.ssdMobilenetv1.loadFromUri("/models");
+    await fapi.nets.faceLandmark68Net.loadFromUri("/models");
+    await fapi.nets.faceRecognitionNet.loadFromUri("/models");
+    modelsLoaded = true;
+  })();
+  return modelsLoading;
+}
+
+/** Pré-charge les modèles en arrière-plan (appeler au montage du composant). */
+export function preloadFaceModels(): void {
+  if (modelsLoaded || modelsLoading) return;
+  loadFaceModels().catch(() => {});
 }
 
 /**
