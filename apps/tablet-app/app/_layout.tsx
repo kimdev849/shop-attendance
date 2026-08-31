@@ -4,7 +4,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "../components/error-boundary";
-import { CheckInFlowProvider } from "./flow-context";
+import { CheckInFlowProvider } from "../lib/flow-context";
 import { theme } from "../components/theme";
 import { flushQueue } from "../services/sync-manager";
 import { subscribeToConnectivity, isOnline } from "../services/network";

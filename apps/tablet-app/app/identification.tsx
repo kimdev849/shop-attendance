@@ -25,7 +25,7 @@ import {
 } from "../storage/worker-cache";
 import { lookupWorkerByEmployeeNumber, searchWorkersByName } from "../services/api";
 import { isOnline } from "../services/network";
-import { useCheckInFlow } from "./flow-context";
+import { useCheckInFlow } from "../lib/flow-context";
 
 export default function IdentificationScreen() {
   const router = useRouter();

@@ -22,7 +22,7 @@ import { PrimaryButton } from "../components/primary-button";
 import { theme } from "../components/theme";
 import { getDeviceConfig } from "../storage/device-config";
 import { verifyWorkerPin } from "../services/api";
-import { useCheckInFlow } from "./flow-context";
+import { useCheckInFlow } from "../lib/flow-context";
 
 export default function PasswordScreen() {
   const router = useRouter();

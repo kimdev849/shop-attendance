@@ -27,7 +27,7 @@ import { isOnline } from "../services/network";
 import { getDeviceConfig } from "../storage/device-config";
 import { enqueueAttendance } from "../storage/attendance-queue";
 import { generateId } from "../lib/uid";
-import { useCheckInFlow } from "./flow-context";
+import { useCheckInFlow } from "../lib/flow-context";
 
 type Step = "loading" | "ready" | "camera" | "comparing" | "success" | "face_error" | "submit_error";
 

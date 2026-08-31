@@ -18,7 +18,7 @@ import {
 import { getDeviceConfig, DeviceConfig } from "../storage/device-config";
 import { queueSize } from "../storage/attendance-queue";
 import { isOnline } from "../services/network";
-import { useCheckInFlow } from "./flow-context";
+import { useCheckInFlow } from "../lib/flow-context";
 
 export default function HomeScreen() {
   const router = useRouter();

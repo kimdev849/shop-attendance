@@ -9,7 +9,7 @@ import {
 import { ScreenContainer } from "../components/screen-container";
 import { PrimaryButton } from "../components/primary-button";
 import { theme } from "../components/theme";
-import { useCheckInFlow } from "./flow-context";
+import { useCheckInFlow } from "../lib/flow-context";
 
 const AUTO_RETURN_MS = 8000;
 
