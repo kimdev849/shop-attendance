@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
+  Platform,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -13,6 +16,9 @@ import {
   ArrowLeft,
   ShieldCheck,
   Camera,
+  XCircle,
+  ScanFace,
+  Info,
 } from "phosphor-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { PrimaryButton } from "../components/primary-button";
@@ -24,9 +30,7 @@ import { enqueueAttendance } from "../storage/attendance-queue";
 import { generateId } from "../lib/uid";
 import { useCheckInFlow } from "./flow-context";
 
-import { Pressable } from "react-native";
-
-type Step = "loading" | "ready" | "camera" | "comparing" | "success" | "error";
+type Step = "loading" | "ready" | "camera" | "comparing" | "success" | "face_error" | "submit_error";
 
 export default function BiometryScreen() {
   const router = useRouter();
@@ -36,10 +40,11 @@ export default function BiometryScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [hasRefPhoto, setHasRefPhoto] = useState(false);
   const [attendanceType, setAttendanceType] = useState<"CHECK_IN" | "CHECK_OUT">("CHECK_IN");
+  const [refPhotoUri, setRefPhotoUri] = useState<string | null>(null);
+  const [capturedUri, setCapturedUri] = useState<string | null>(null);
 
   useEffect(() => {
     if (!worker) {
-      // Defer navigation to avoid "navigate before mounting" error
       const t = setTimeout(() => router.replace("/identification"), 100);
       return () => clearTimeout(t);
     }
@@ -49,9 +54,13 @@ export default function BiometryScreen() {
   async function initScreen() {
     try {
       const config = await getDeviceConfig();
-      if (!config) { setStep("error"); setMessage("Tablette non configurée."); return; }
+      if (!config) { setStep("submit_error"); setMessage("Tablette non configurée."); return; }
       const data = await getFacePhotoForCheckIn(worker!.employeeNumber, config.shopId);
-      setHasRefPhoto(!!data?.facePhoto);
+      const hasPhoto = !!data?.facePhoto;
+      setHasRefPhoto(hasPhoto);
+      if (hasPhoto && data?.facePhoto) {
+        setRefPhotoUri(data.facePhoto);
+      }
       setAttendanceType(data?.nextAction ?? "CHECK_IN");
       setStep("ready");
     } catch {
@@ -64,16 +73,17 @@ export default function BiometryScreen() {
   async function handleCapture() {
     setStep("camera");
 
-    // 1. Request camera permission
+    // 1. Permission
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      setStep("error");
+      setStep("submit_error");
       setMessage("Permission caméra refusée. Activez-la dans les paramètres de votre appareil.");
       return;
     }
 
-    // 2. Open camera
+    // 2. Camera
     let photoData: string | null = null;
+    let localUri: string | null = null;
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -88,10 +98,11 @@ export default function BiometryScreen() {
       }
 
       photoData = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      localUri = result.assets[0].uri;
+      setCapturedUri(localUri);
     } catch (err: any) {
-      setStep("error");
-      const detail = err?.message ?? err?.toString() ?? "Erreur inconnue";
-      setMessage("Impossible d'ouvrir la caméra: " + detail);
+      setStep("submit_error");
+      setMessage("Impossible d'ouvrir la caméra: " + (err?.message ?? "Erreur inconnue"));
       return;
     }
 
@@ -103,24 +114,23 @@ export default function BiometryScreen() {
         if (!config || !worker) throw new Error("Config manquante.");
         const faceResult = await verifyFace(worker.employeeNumber, config.shopId, photoData);
         if (!faceResult.matched) {
-          setStep("error");
-          setMessage("Le visage ne correspond pas à la photo enregistrée. Réessayez.");
+          setStep("face_error");
+          setMessage("Le visage ne correspond pas à la photo enregistrée.");
           return;
         }
       } catch (err: any) {
         const msg = err?.message ?? "";
-        // If endpoint not found or network issue — still proceed
         if (msg.includes("404") || msg.includes("Not Found") || msg.includes("fetch") || msg.includes("Network")) {
-          // OK
+          // Endpoint not available — proceed without verification
         } else {
-          setStep("error");
-          setMessage("Erreur de vérification faciale. Réessayez.");
+          setStep("face_error");
+          setMessage("Erreur lors de la vérification faciale.");
           return;
         }
       }
     }
 
-    // 4. Submit attendance
+    // 4. Submit
     await doCheckIn();
   }
 
@@ -163,7 +173,6 @@ export default function BiometryScreen() {
       setStep("success");
       setTimeout(() => router.replace("/confirmation"), 1200);
     } catch (err: any) {
-      // Offline fallback
       try {
         const config = await getDeviceConfig();
         if (config && worker) {
@@ -184,9 +193,15 @@ export default function BiometryScreen() {
           return;
         }
       } catch {}
-      setStep("error");
+      setStep("submit_error");
       setMessage(err?.message ?? "Erreur lors du pointage.");
     }
+  }
+
+  function handleRetry() {
+    setMessage(null);
+    setCapturedUri(null);
+    setStep("ready");
   }
 
   return (
@@ -196,6 +211,7 @@ export default function BiometryScreen() {
         <Text style={styles.backText}>Retour</Text>
       </Pressable>
 
+      {/* ── Loading ── */}
       {step === "loading" && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -203,6 +219,7 @@ export default function BiometryScreen() {
         </View>
       )}
 
+      {/* ── Ready ── */}
       {step === "ready" && (
         <View style={styles.center}>
           <View style={styles.iconWrap}>
@@ -216,7 +233,7 @@ export default function BiometryScreen() {
           </Text>
           <Text style={styles.hint}>
             {attendanceType === "CHECK_OUT"
-              ? "Vous avez déjà pointé aujourd'hui — confirmez votre sortie"
+              ? "Vous avez déjà pointé aujourd'hui"
               : hasRefPhoto
                 ? "Votre visage sera comparé à la photo enregistrée"
                 : "Capturez une photo pour confirmer votre présence"}
@@ -231,6 +248,7 @@ export default function BiometryScreen() {
         </View>
       )}
 
+      {/* ── Camera opening ── */}
       {step === "camera" && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -238,13 +256,17 @@ export default function BiometryScreen() {
         </View>
       )}
 
+      {/* ── Comparing / Submitting ── */}
       {step === "comparing" && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.hint}>Vérification en cours...</Text>
+          <Text style={styles.hint}>
+            {hasRefPhoto ? "Vérification du visage..." : "Envoi du pointage..."}
+          </Text>
         </View>
       )}
 
+      {/* ── Success ── */}
       {step === "success" && (
         <View style={styles.center}>
           <View style={styles.iconGreen}>
@@ -256,7 +278,60 @@ export default function BiometryScreen() {
         </View>
       )}
 
-      {step === "error" && (
+      {/* ── Face Verification Error ── */}
+      {step === "face_error" && (
+        <View style={styles.errorContainer}>
+          <View style={styles.faceErrorCard}>
+            {/* Header */}
+            <View style={styles.faceErrorHeader}>
+              <View style={styles.iconRedSmall}>
+                <XCircle size={24} color={theme.colors.danger} weight="fill" />
+              </View>
+              <Text style={styles.faceErrorTitle}>Visage non reconnu</Text>
+            </View>
+
+            {/* Photo comparison */}
+            <View style={styles.photoCompare}>
+              {refPhotoUri ? (
+                <View style={styles.photoBox}>
+                  <Image source={{ uri: refPhotoUri }} style={styles.photoImg} resizeMode="cover" />
+                  <Text style={styles.photoLabel}>Photo enregistrée</Text>
+                </View>
+              ) : null}
+              {capturedUri ? (
+                <View style={styles.photoBox}>
+                  <Image source={{ uri: capturedUri }} style={styles.photoImg} resizeMode="cover" />
+                  <Text style={styles.photoLabel}>Photo capturée</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Message */}
+            <Text style={styles.faceErrorMsg}>{message}</Text>
+
+            {/* Tips */}
+            <View style={styles.tipsCard}>
+              <Info size={14} color={theme.colors.textMuted} weight="bold" />
+              <Text style={styles.tipsText}>
+                {"Assurez-vous d'être bien face à la caméra, avec un éclairage suffisant."}
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ height: 24 }} />
+          <PrimaryButton label="Réessayer" onPress={handleRetry} fullWidth />
+          <View style={{ height: 12 }} />
+          <PrimaryButton
+            label="Retour"
+            variant="secondary"
+            onPress={() => router.replace("/identification")}
+            fullWidth
+          />
+        </View>
+      )}
+
+      {/* ── Submit / Network Error ── */}
+      {step === "submit_error" && (
         <View style={styles.center}>
           <View style={styles.iconRed}>
             <WarningCircle size={48} color={theme.colors.danger} weight="fill" />
@@ -264,9 +339,14 @@ export default function BiometryScreen() {
           <Text style={styles.errorText}>Erreur</Text>
           {message ? <Text style={styles.hint}>{message}</Text> : null}
           <View style={{ height: 24 }} />
-          <PrimaryButton label="Réessayer" onPress={() => { setMessage(null); setStep("ready"); }} fullWidth />
+          <PrimaryButton label="Réessayer" onPress={handleRetry} fullWidth />
           <View style={{ height: 12 }} />
-          <PrimaryButton label="Retour" variant="secondary" onPress={() => router.replace("/identification")} fullWidth />
+          <PrimaryButton
+            label="Retour"
+            variant="secondary"
+            onPress={() => router.replace("/identification")}
+            fullWidth
+          />
         </View>
       )}
     </View>
@@ -284,6 +364,7 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: "center", justifyContent: "center",
     paddingHorizontal: 24, gap: 8,
   },
+  // ── Ready state ──
   iconWrap: {
     width: 72, height: 72, borderRadius: 36,
     backgroundColor: theme.colors.primary + "12",
@@ -293,16 +374,72 @@ const styles = StyleSheet.create({
   title: { color: theme.colors.text, fontSize: 24, fontWeight: "800" },
   subtitle: { color: theme.colors.textSecondary, fontSize: 16, fontWeight: "600", marginTop: 4 },
   hint: { color: theme.colors.textMuted, fontSize: 14, textAlign: "center", marginTop: 4 },
+  // ── Success ──
   iconGreen: {
     width: 80, height: 80, borderRadius: 40,
     backgroundColor: "rgba(16,185,129,0.1)", alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: "rgba(16,185,129,0.2)",
   },
+  successText: { color: theme.colors.success, fontSize: 20, fontWeight: "800" },
+  // ── Generic error ──
   iconRed: {
     width: 80, height: 80, borderRadius: 40,
     backgroundColor: "rgba(239,68,68,0.08)", alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: "rgba(239,68,68,0.15)",
   },
-  successText: { color: theme.colors.success, fontSize: 20, fontWeight: "800" },
   errorText: { color: theme.colors.danger, fontSize: 20, fontWeight: "800" },
+  // ── Face error screen ──
+  errorContainer: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  faceErrorCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.15)",
+    ...theme.shadow,
+  },
+  faceErrorHeader: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    marginBottom: 20,
+  },
+  iconRedSmall: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: "rgba(239,68,68,0.1)",
+    alignItems: "center", justifyContent: "center",
+  },
+  faceErrorTitle: {
+    color: theme.colors.danger, fontSize: 18, fontWeight: "700",
+  },
+  photoCompare: {
+    flexDirection: "row", gap: 12, marginBottom: 16,
+  },
+  photoBox: {
+    flex: 1, alignItems: "center", gap: 6,
+  },
+  photoImg: {
+    width: "100%", height: 120, borderRadius: 12,
+    backgroundColor: theme.colors.surfaceAlt,
+    borderWidth: 1, borderColor: theme.colors.border,
+  },
+  photoLabel: {
+    color: theme.colors.textMuted, fontSize: 11, fontWeight: "600",
+  },
+  faceErrorMsg: {
+    color: theme.colors.textSecondary, fontSize: 14,
+    textAlign: "center", lineHeight: 20, marginBottom: 16,
+  },
+  tipsCard: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    backgroundColor: theme.colors.background,
+    borderRadius: 12, padding: 12,
+    borderWidth: 1, borderColor: theme.colors.border,
+  },
+  tipsText: {
+    color: theme.colors.textMuted, fontSize: 12, lineHeight: 18, flex: 1,
+  },
 });
