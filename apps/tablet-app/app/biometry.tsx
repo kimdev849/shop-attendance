@@ -76,7 +76,7 @@ export default function BiometryScreen() {
     let photoData: string | null = null;
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ["images"],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 0.7,
         base64: true,
         allowsEditing: false,
@@ -90,7 +90,8 @@ export default function BiometryScreen() {
       photoData = `data:image/jpeg;base64,${result.assets[0].base64}`;
     } catch (err: any) {
       setStep("error");
-      setMessage("Impossible d'ouvrir la caméra. Réessayez.");
+      const detail = err?.message ?? err?.toString() ?? "Erreur inconnue";
+      setMessage("Impossible d'ouvrir la caméra: " + detail);
       return;
     }
 
