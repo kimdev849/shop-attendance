@@ -69,9 +69,17 @@ export class WorkersRepository {
     return this.prisma.worker.update({ where: { id }, data });
   }
 
-  async findActiveByShop(shopId: string) {
+  async findActiveByShop(shopId: string, search?: string) {
+    const where: any = { shopId, status: "ACTIVE" };
+    if (search) {
+      where.OR = [
+        { firstName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
+        { employeeNumber: { contains: search, mode: "insensitive" } },
+      ];
+    }
     return this.prisma.worker.findMany({
-      where: { shopId, status: "ACTIVE" },
+      where,
       select: { id: true, employeeNumber: true, firstName: true, lastName: true },
       orderBy: { lastName: "asc" },
     });

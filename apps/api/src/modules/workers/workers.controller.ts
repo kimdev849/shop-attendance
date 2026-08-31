@@ -35,8 +35,8 @@ export class WorkersController {
    */
   @Public()
   @Get("roster")
-  rosterForShop(@Query("shopId") shopId: string) {
-    return this.workersService.rosterForShop(shopId);
+  rosterForShop(@Query("shopId") shopId: string, @Query("search") search?: string) {
+    return this.workersService.rosterForShop(shopId, search);
   }
 
   @Post()

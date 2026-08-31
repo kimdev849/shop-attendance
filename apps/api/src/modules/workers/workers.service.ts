@@ -165,8 +165,8 @@ export class WorkersService {
     };
   }
 
-  async rosterForShop(shopId: string): Promise<WorkerRosterItem[]> {
-    return this.repository.findActiveByShop(shopId);
+  async rosterForShop(shopId: string, search?: string): Promise<WorkerRosterItem[]> {
+    return this.repository.findActiveByShop(shopId, search);
   }
 
   // --- Mot de passe personnel ---

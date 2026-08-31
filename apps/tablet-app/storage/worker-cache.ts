@@ -33,3 +33,19 @@ export async function findInCachedRoster(employeeNumber: string): Promise<Cached
   const roster = await getCachedRoster();
   return roster.find((w) => w.employeeNumber === employeeNumber) ?? null;
 }
+
+/**
+ * Search cached roster by name (first name or last name).
+ * Returns matching workers for offline search.
+ */
+export async function searchCachedRoster(query: string): Promise<CachedWorker[]> {
+  const roster = await getCachedRoster();
+  const q = query.toLowerCase().trim();
+  if (!q) return roster;
+  return roster.filter(
+    (w) =>
+      w.firstName.toLowerCase().includes(q) ||
+      w.lastName.toLowerCase().includes(q) ||
+      w.employeeNumber.toLowerCase().includes(q),
+  );
+}

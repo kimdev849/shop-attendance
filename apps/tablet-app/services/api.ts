@@ -84,6 +84,19 @@ export async function lookupWorkerByEmployeeNumber(employeeNumber: string, shopI
   return response.json();
 }
 
+/**
+ * Search workers by name within a shop.
+ * Used by the identification screen for name-based search.
+ */
+export async function searchWorkersByName(shopId: string, search: string) {
+  const params = new URLSearchParams({ shopId, search });
+  const response = await fetchWithTimeout(`${API_URL}/v1/workers/roster?${params.toString()}`, {
+    method: "GET",
+  });
+  if (!response.ok) throw new Error("Impossible de rechercher les travailleurs.");
+  return response.json() as Promise<Array<{ id: string; employeeNumber: string; firstName: string; lastName: string }>>;
+}
+
 export async function verifyWorkerPin(employeeNumber: string, shopId: string, pin: string) {
   const response = await fetchWithTimeout(`${API_URL}/v1/workers/verify-pin`, {
     method: "POST",
