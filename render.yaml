@@ -10,7 +10,7 @@ services:
     name: shop-attendance-api
     runtime: node
     region: frankfurt
-    buildCommand: npm install && npm run build:api
+    buildCommand: npm install && npm run prisma:migrate:deploy --workspace=apps/api && npm run build:api
     startCommand: npm run start:prod --workspace=apps/api
     envVars:
       - key: NODE_ENV
