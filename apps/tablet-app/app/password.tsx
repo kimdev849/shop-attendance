@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -24,9 +23,6 @@ import { getDeviceConfig } from "../storage/device-config";
 import { verifyWorkerPin } from "../services/api";
 import { useCheckInFlow } from "./flow-context";
 
-const PIN_LENGTH = 4;
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-
 export default function PasswordScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -34,10 +30,9 @@ export default function PasswordScreen() {
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [shake, setShake] = useState(false);
 
   async function handleVerify() {
-    if (!worker || pin.length < PIN_LENGTH) return;
+    if (!worker || pin.trim().length < 4) return;
     setError(null);
     setLoading(true);
 
@@ -58,27 +53,9 @@ export default function PasswordScreen() {
       } else {
         setError(msg);
       }
-      // Shake animation
-      setShake(true);
       setPin("");
-      setTimeout(() => setShake(false), 500);
     } finally {
       setLoading(false);
-    }
-  }
-
-  function handlePinChange(text: string) {
-    // Only allow digits
-    const cleaned = text.replace(/[^0-9]/g, "").slice(0, PIN_LENGTH);
-    setPin(cleaned);
-    setError(null);
-
-    // Auto-submit when full
-    if (cleaned.length === PIN_LENGTH) {
-      setTimeout(() => {
-        setPin(cleaned);
-        // Trigger verify
-      }, 200);
     }
   }
 
@@ -104,7 +81,7 @@ export default function PasswordScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
-        {/* Back button */}
+        {/* Back */}
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <ArrowLeft size={20} color={theme.colors.textSecondary} weight="bold" />
           <Text style={styles.backText}>Retour</Text>
@@ -113,46 +90,46 @@ export default function PasswordScreen() {
         {/* Content */}
         <View style={styles.content}>
           {/* Avatar */}
-          <View style={styles.avatarLarge}>
-            <Text style={styles.avatarInitials}>
+          <View style={styles.avatar}>
+            <Text style={styles.initials}>
               {worker.firstName.charAt(0)}{worker.lastName.charAt(0)}
             </Text>
           </View>
 
-          {/* Worker name */}
           <Text style={styles.workerName}>
             {worker.firstName} {worker.lastName}
           </Text>
           <Text style={styles.workerNumber}>{worker.employeeNumber}</Text>
 
-          {/* Divider */}
           <View style={styles.divider} />
 
-          {/* PIN icon */}
+          {/* Icon */}
           <View style={styles.iconWrap}>
             <Fingerprint size={28} color={theme.colors.primary} weight="fill" />
           </View>
 
-          {/* Title */}
           <Text style={styles.title}>Code PIN</Text>
           <Text style={styles.subtitle}>
-            Entrez votre code à {PIN_LENGTH} chiffres
+            Saisissez votre code à 4 chiffres
           </Text>
 
-          {/* PIN dots */}
-          <View style={[styles.dotsRow, shake && styles.dotsShake]}>
-            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.dot,
-                  i < pin.length && styles.dotFilled,
-                  error && styles.dotError,
-                ]}
-              >
-                {i < pin.length && <View style={styles.dotInner} />}
-              </View>
-            ))}
+          {/* PIN input */}
+          <View style={styles.inputWrap}>
+            <TextInput
+              value={pin}
+              onChangeText={(t) => {
+                setPin(t.replace(/[^0-9]/g, "").slice(0, 6));
+                setError(null);
+              }}
+              placeholder="••••"
+              placeholderTextColor={theme.colors.textMuted}
+              secureTextEntry
+              autoFocus
+              keyboardType="number-pad"
+              maxLength={6}
+              style={styles.input}
+              onSubmitEditing={handleVerify}
+            />
           </View>
 
           {/* Error */}
@@ -163,44 +140,14 @@ export default function PasswordScreen() {
             </View>
           )}
 
-          {/* Hidden input for keyboard */}
-          <TextInput
-            value={pin}
-            onChangeText={handlePinChange}
-            keyboardType="number-pad"
-            maxLength={PIN_LENGTH}
-            autoFocus
-            style={styles.hiddenInput}
-            onSubmitEditing={handleVerify}
-          />
+          {/* Hint */}
+          <Text style={styles.hint}>
+            Demandez votre code à votre responsable
+          </Text>
 
-          {/* Number pad */}
-          <View style={styles.numpad}>
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
-              <Pressable
-                key={num}
-                style={({ pressed }) => [styles.numKey, pressed && styles.numKeyPressed]}
-                onPress={() => handlePinChange(pin + String(num))}
-              >
-                <Text style={styles.numText}>{num}</Text>
-              </Pressable>
-            ))}
-            <View style={styles.numKey} />
-            <Pressable
-              style={({ pressed }) => [styles.numKey, pressed && styles.numKeyPressed]}
-              onPress={() => handlePinChange(pin + "0")}
-            >
-              <Text style={styles.numText}>0</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.numKey, pressed && styles.numKeyPressed]}
-              onPress={() => setPin(pin.slice(0, -1))}
-            >
-              <Text style={styles.numText}>⌫</Text>
-            </Pressable>
-          </View>
+          <View style={{ flex: 1 }} />
 
-          {/* Submit */}
+          {/* Submit — en bas, facile à cliquer */}
           {loading ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator color={theme.colors.primary} size="large" />
@@ -210,10 +157,12 @@ export default function PasswordScreen() {
             <PrimaryButton
               label="Valider"
               onPress={handleVerify}
-              disabled={pin.length < PIN_LENGTH}
+              disabled={pin.trim().length < 4}
               fullWidth
             />
           )}
+
+          <View style={{ height: insets.bottom + 16 }} />
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -242,10 +191,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingTop: 8,
   },
   // Avatar
-  avatarLarge: {
+  avatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
@@ -256,7 +205,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.colors.primary + "30",
   },
-  avatarInitials: {
+  initials: {
     color: theme.colors.primary,
     fontSize: 24,
     fontWeight: "800",
@@ -278,7 +227,6 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     marginVertical: 20,
   },
-  // Icon + title
   iconWrap: {
     width: 56,
     height: 56,
@@ -298,51 +246,37 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 6,
   },
-  // PIN dots
-  dotsRow: {
-    flexDirection: "row",
-    gap: 16,
-    marginTop: 32,
-    marginBottom: 24,
+  // PIN input
+  inputWrap: {
+    width: "100%",
+    maxWidth: 280,
+    marginTop: 28,
   },
-  dotsShake: {
-    // @ts-ignore
-    animation: "shake 0.5s",
-  },
-  dot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
+  input: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 14,
+    borderWidth: 1.5,
     borderColor: theme.colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dotFilled: {
-    borderColor: theme.colors.primary,
-    backgroundColor: theme.colors.primary + "15",
-  },
-  dotError: {
-    borderColor: "#ef4444",
-  },
-  dotInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: theme.colors.primary,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    fontSize: 28,
+    color: theme.colors.text,
+    textAlign: "center",
+    letterSpacing: 12,
+    fontWeight: "600",
   },
   // Error
   errorBox: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    marginTop: 14,
     backgroundColor: "rgba(239,68,68,0.08)",
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "rgba(239,68,68,0.15)",
-    marginBottom: 8,
   },
   errorText: {
     color: "#ef4444",
@@ -350,41 +284,11 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
-  // Hidden input
-  hiddenInput: {
-    position: "absolute",
-    opacity: 0,
-    width: 1,
-    height: 1,
-  },
-  // Numpad
-  numpad: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 12,
-    width: SCREEN_WIDTH * 0.75,
-    maxWidth: 300,
-    marginBottom: 24,
-  },
-  numKey: {
-    width: 72,
-    height: 56,
-    borderRadius: 14,
-    backgroundColor: theme.colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  numKeyPressed: {
-    opacity: 0.6,
-    backgroundColor: theme.colors.surfaceAlt,
-  },
-  numText: {
-    color: theme.colors.text,
-    fontSize: 22,
-    fontWeight: "600",
+  hint: {
+    color: theme.colors.textMuted,
+    fontSize: 13,
+    marginTop: 16,
+    textAlign: "center",
   },
   // Loading
   loadingWrap: {
@@ -395,7 +299,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 14,
   },
-  // Empty state
+  // Empty
   centerWrap: {
     flex: 1,
     alignItems: "center",

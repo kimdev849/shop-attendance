@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { v4 as uuidv4 } from "uuid";
+import { generateId } from "../lib/uid";
 import {
   Camera,
   CheckCircle,
@@ -120,7 +120,7 @@ export default function BiometryScreen() {
         shopId: config.shopId,
         deviceId: config.deviceId,
         clientTimestamp: new Date().toISOString(),
-        clientRequestId: uuidv4(),
+        clientRequestId: generateId(),
         biometricConfirmed: true,
       };
 
@@ -159,7 +159,7 @@ export default function BiometryScreen() {
             shopId: config.shopId,
             deviceId: config.deviceId,
             clientTimestamp: new Date().toISOString(),
-            clientRequestId: uuidv4(),
+            clientRequestId: generateId(),
             biometricConfirmed: true,
             queuedAt: new Date().toISOString(),
           });
