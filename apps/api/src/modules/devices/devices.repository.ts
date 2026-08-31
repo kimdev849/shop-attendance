@@ -19,6 +19,13 @@ export class DevicesRepository {
     return this.prisma.device.findMany({ where: { shopId } });
   }
 
+  async findByNameAndShop(name: string, shopId: string) {
+    return this.prisma.device.findFirst({
+      where: { name, shopId },
+      include: { shop: { select: { id: true, name: true, code: true } } },
+    });
+  }
+
   async count(where?: any) {
     return this.prisma.device.count({ where });
   }

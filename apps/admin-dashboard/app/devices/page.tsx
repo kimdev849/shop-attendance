@@ -34,6 +34,7 @@ export default function DevicesPage() {
   const [editId, setEditId] = useState("");
   const [form, setForm] = useState({ name: "", shopId: "" });
   const [saving, setSaving] = useState(false);
+  const [createdDevice, setCreatedDevice] = useState<any>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -68,8 +69,8 @@ export default function DevicesPage() {
   async function handleCreate() {
     setSaving(true);
     try {
-      await api.devices.create(form);
-      toast("Tablette créée avec succès.", "success");
+      const { data } = await api.devices.create(form);
+      setCreatedDevice(data);
       setCreateOpen(false);
       setForm({ name: "", shopId: "" });
       setRefreshKey((k) => k + 1);
@@ -226,6 +227,41 @@ export default function DevicesPage() {
             <Button onClick={handleEdit} disabled={saving || !form.name || !form.shopId}>{saving ? "Enregistrement..." : "Enregistrer"}</Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal open={!!createdDevice} onClose={() => setCreatedDevice(null)} title="Tablette créée !">
+        {createdDevice && (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Informez l'utilisateur de la tablette des informations ci-dessous pour qu'il les saisisse dans l'écran de configuration.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Nom</p>
+                <p className="text-sm font-medium">{createdDevice.name}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Identifiant</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm">{createdDevice.deviceIdentifier}</code>
+                  <Button variant="outline" size="sm" onClick={() => { navigator.clipboard.writeText(createdDevice.deviceIdentifier); toast("Copié !", "success"); }}>
+                    Copier
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Shop</p>
+                <p className="text-sm font-medium">{createdDevice.shop?.name ?? shops.find((s) => s.id === createdDevice.shopId)?.name ?? "—"}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Sur la tablette, allez dans <strong>Configuration</strong> et saisissez le <strong>même nom</strong> et le <strong>même shop</strong>. La tablette se liera automatiquement.
+            </p>
+            <div className="flex justify-end pt-2">
+              <Button onClick={() => setCreatedDevice(null)}>Fermer</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </AppShell>
   );

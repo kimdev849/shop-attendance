@@ -160,23 +160,19 @@ export async function fetchShops(search?: string, page = 1, limit = 50) {
 }
 
 /**
- * Register this tablet with the server.
- * Returns the created/updated device with its auto-generated deviceIdentifier.
+ * Find an existing device by name + shopId.
+ * The admin creates the tablet on the dashboard first, then the user
+ * enters the same name/shop on the tablet settings to link to it.
  */
-export async function registerDevice(payload: {
-  deviceIdentifier?: string;
-  name: string;
-  shopId: string;
-}) {
-  const response = await fetchWithTimeout(`${API_URL}/v1/devices`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+export async function findExistingDevice(name: string, shopId: string) {
+  const params = new URLSearchParams({ name, shopId });
+  const response = await fetchWithTimeout(`${API_URL}/v1/devices/find?${params.toString()}`, {
+    method: "GET",
   });
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.message ?? `Erreur lors de l'enregistrement (${response.status})`);
+    throw new Error(body.message ?? "Tablette introuvable. Créez-la d'abord depuis le dashboard admin.");
   }
 
   return response.json() as Promise<{

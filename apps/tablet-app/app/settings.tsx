@@ -37,7 +37,7 @@ import {
 } from "../storage/device-config";
 import { queueSize } from "../storage/attendance-queue";
 import { flushQueue } from "../services/sync-manager";
-import { fetchShops, registerDevice } from "../services/api";
+import { fetchShops, findExistingDevice } from "../services/api";
 import { isOnline } from "../services/network";
 
 export default function SettingsScreen() {
@@ -124,7 +124,7 @@ export default function SettingsScreen() {
     if (!deviceName.trim()) { setError("Donnez un nom à cette tablette."); return; }
     setSaving(true);
     try {
-      const device = await registerDevice({ name: deviceName.trim(), shopId: selectedShop.id });
+      const device = await findExistingDevice(deviceName.trim(), selectedShop.id);
       const config: DeviceConfig = {
         apiUrl: process.env.EXPO_PUBLIC_API_URL ?? "https://shop-attendance-api.onrender.com",
         shopId: selectedShop.id,
@@ -137,7 +137,7 @@ export default function SettingsScreen() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: any) {
-      setError(err?.message ?? "Erreur lors de l'enregistrement.");
+      setError(err?.message ?? "Impossible de trouver la tablette. Vérifiez le nom et le shop, ou créez-la depuis le dashboard admin.");
     } finally {
       setSaving(false);
     }
@@ -167,7 +167,7 @@ export default function SettingsScreen() {
             </View>
             <Text style={styles.title}>Configuration</Text>
             <Text style={styles.subtitle}>
-              Sélectionnez un point de vente{"\n"}et donnez un nom à cette tablette.
+              Sélectionnez un point de vente{"\n"}et entrez le nom de la tablette{"\n"}(même nom que sur le dashboard admin).
             </Text>
           </View>
 

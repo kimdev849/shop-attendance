@@ -27,6 +27,16 @@ export class DevicesController {
     return this.devicesService.heartbeat(id);
   }
 
+  /**
+   * Public endpoint used by tablet to find an existing device by name + shop.
+   * The tablet enters the same name/shopId that the admin put on the dashboard.
+   */
+  @Public()
+  @Get("find")
+  findByKey(@Query("name") name: string, @Query("shopId") shopId: string) {
+    return this.devicesService.findByKey(name, shopId);
+  }
+
   @Get()
   @Roles(UserRole.ADMIN, UserRole.SHOP_MANAGER)
   findAll(

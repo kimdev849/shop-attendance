@@ -70,6 +70,16 @@ export class DevicesService {
     return this.repository.heartbeat(id);
   }
 
+  /**
+   * Find a device by name + shopId. Used by the tablet to link to an existing
+   * device created by the admin on the dashboard.
+   */
+  async findByKey(name: string, shopId: string) {
+    const device = await this.repository.findByNameAndShop(name, shopId);
+    if (!device) throw new NotFoundException("Tablette introuvable. Créez-la d'abord depuis le dashboard admin.");
+    return device;
+  }
+
   private async ensureExists(id: string) {
     const device = await this.repository.findById(id);
     if (!device) throw new NotFoundException("Tablette introuvable.");
