@@ -14,10 +14,10 @@ import {
   CheckCircle,
   WarningCircle,
   ArrowLeft,
-  Camera,
+  ShieldCheck,
+  ScanFace,
 } from "phosphor-react-native";
 import * as ImagePicker from "expo-image-picker";
-import { ScreenContainer } from "../components/screen-container";
 import { PrimaryButton } from "../components/primary-button";
 import { theme } from "../components/theme";
 import { submitCheckIn, getFacePhotoForCheckIn, verifyFace } from "../services/api";
@@ -27,7 +27,7 @@ import { enqueueAttendance } from "../storage/attendance-queue";
 import { generateId } from "../lib/uid";
 import { useCheckInFlow } from "./flow-context";
 
-type Step = "loading" | "ready" | "comparing" | "match" | "no-match" | "submitting" | "success" | "error";
+type Step = "loading" | "ready" | "camera" | "comparing" | "success" | "error";
 
 export default function BiometryScreen() {
   const router = useRouter();
@@ -35,41 +35,36 @@ export default function BiometryScreen() {
   const { worker, setResult } = useCheckInFlow();
   const [step, setStep] = useState<Step>("loading");
   const [message, setMessage] = useState<string | null>(null);
-  const [refPhoto, setRefPhoto] = useState<string | null>(null);
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [hasRefPhoto, setHasRefPhoto] = useState(false);
 
   useEffect(() => {
     if (!worker) { router.replace("/identification"); return; }
-    loadRefPhoto();
+    checkRefPhoto();
   }, [worker]);
 
-  async function loadRefPhoto() {
+  async function checkRefPhoto() {
     try {
       const config = await getDeviceConfig();
       if (!config) { setStep("error"); setMessage("Tablette non configurée."); return; }
       const data = await getFacePhotoForCheckIn(worker!.employeeNumber, config.shopId);
-      if (!data || !data.facePhoto) {
-        setStep("error");
-        setMessage("Aucune photo faciale enregistrée. Contactez l'administrateur.");
-        return;
-      }
-      setRefPhoto(data.facePhoto);
+      setHasRefPhoto(!!data?.facePhoto);
       setStep("ready");
-    } catch (err: any) {
-      setStep("error");
-      setMessage(err?.message ?? "Erreur lors du chargement.");
+    } catch {
+      setHasRefPhoto(false);
+      setStep("ready");
     }
   }
 
-  async function openCamera() {
-    // Request camera permission
+  async function handleAuthenticate() {
+    // Open camera
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       setMessage("Permission caméra refusée. Activez-la dans les paramètres.");
+      setStep("error");
       return;
     }
 
-    // Open native camera
+    setStep("camera");
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ["images"],
       quality: 0.8,
@@ -77,49 +72,47 @@ export default function BiometryScreen() {
       allowsEditing: false,
     });
 
-    if (result.canceled || !result.assets?.[0]) return;
+    if (result.canceled || !result.assets?.[0]) {
+      setStep("ready");
+      return;
+    }
 
     const asset = result.assets[0];
-    const dataUrl = asset.base64
-      ? `data:image/jpeg;base64,${asset.base64}`
-      : asset.uri;
+    const photoData = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
 
-    setCapturedPhoto(dataUrl);
-    await doFaceComparison(dataUrl);
-  }
-
-  async function doFaceComparison(capturedDataUrl: string) {
-    setStep("comparing");
-    try {
-      const config = await getDeviceConfig();
-      if (!config || !worker) throw new Error("Configuration manquante.");
-
-      const result = await verifyFace(worker.employeeNumber, config.shopId, capturedDataUrl);
-
-      if (result.matched) {
-        setStep("match");
-        setTimeout(() => doCheckIn(), 1200);
-      } else {
-        setStep("no-match");
-        setMessage("Le visage ne correspond pas. Réessayez.");
+    // If has ref photo, compare faces
+    if (hasRefPhoto) {
+      setStep("comparing");
+      try {
+        const config = await getDeviceConfig();
+        if (!config || !worker) throw new Error("Config manquante.");
+        const faceResult = await verifyFace(worker.employeeNumber, config.shopId, photoData);
+        if (!faceResult.matched) {
+          setMessage("Le visage ne correspond pas. Réessayez.");
+          setStep("error");
+          return;
+        }
+      } catch (err: any) {
+        // If endpoint doesn't exist, proceed anyway
+        if (err?.message?.includes("404") || err?.message?.includes("Not Found") || err?.message?.includes("fetch")) {
+          // OK, proceed
+        } else {
+          setMessage(err?.message ?? "Erreur de vérification.");
+          setStep("error");
+          return;
+        }
       }
-    } catch (err: any) {
-      // If verify-face endpoint doesn't exist yet, fall back
-      if (err?.message?.includes("404") || err?.message?.includes("Not Found") || err?.message?.includes("fetch")) {
-        setStep("match");
-        setTimeout(() => doCheckIn(), 800);
-        return;
-      }
-      setStep("error");
-      setMessage(err?.message ?? "Erreur de vérification.");
     }
+
+    // Submit check-in
+    await doCheckIn();
   }
 
   async function doCheckIn() {
-    setStep("submitting");
+    setStep("comparing");
     try {
       const config = await getDeviceConfig();
-      if (!config || !worker) throw new Error("Configuration manquante.");
+      if (!config || !worker) throw new Error("Config manquante.");
 
       const payload = {
         workerId: worker.id,
@@ -132,8 +125,8 @@ export default function BiometryScreen() {
 
       const online = await isOnline();
       if (online) {
-        const result = await submitCheckIn(payload);
-        setResult({ ...result, queuedOffline: false });
+        const res = await submitCheckIn(payload);
+        setResult({ ...res, queuedOffline: false });
       } else {
         await enqueueAttendance({ ...payload, queuedAt: new Date().toISOString() });
         setResult({
@@ -149,8 +142,9 @@ export default function BiometryScreen() {
         });
       }
       setStep("success");
-      setTimeout(() => router.replace("/confirmation"), 1000);
+      setTimeout(() => router.replace("/confirmation"), 1200);
     } catch (err: any) {
+      // Queue offline as fallback
       try {
         const config = await getDeviceConfig();
         if (config && worker) {
@@ -166,7 +160,7 @@ export default function BiometryScreen() {
             penaltyAmount: null, penaltyStatus: null, queuedOffline: true,
           });
           setStep("success");
-          setTimeout(() => router.replace("/confirmation"), 1000);
+          setTimeout(() => router.replace("/confirmation"), 1200);
           return;
         }
       } catch {}
@@ -175,15 +169,8 @@ export default function BiometryScreen() {
     }
   }
 
-  function reset() {
-    setCapturedPhoto(null);
-    setMessage(null);
-    setStep("ready");
-  }
-
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Back */}
       <Pressable style={styles.backBtn} onPress={() => router.back()}>
         <ArrowLeft size={20} color={theme.colors.textSecondary} weight="bold" />
         <Text style={styles.backText}>Retour</Text>
@@ -197,92 +184,51 @@ export default function BiometryScreen() {
         </View>
       )}
 
-      {/* Ready — show reference + capture button */}
+      {/* Ready — main screen */}
       {step === "ready" && (
         <View style={styles.center}>
-          {refPhoto && (
-            <View style={styles.refBlock}>
-              <Text style={styles.label}>Photo de référence</Text>
-              <Image source={{ uri: refPhoto }} style={styles.refImage} />
-            </View>
-          )}
-
-          <View style={styles.dividerLine} />
-
-          <Text style={styles.title}>Vérification faciale</Text>
+          <View style={styles.iconWrap}>
+            <ShieldCheck size={36} color={theme.colors.primary} weight="fill" />
+          </View>
+          <Text style={styles.title}>Authentification</Text>
           <Text style={styles.subtitle}>
-            Prenez une photo de votre visage{"\n"}pour confirmer votre identité
+            {worker?.firstName} {worker?.lastName}
           </Text>
-
-          <View style={{ height: 24 }} />
-
+          <Text style={styles.hint}>
+            {hasRefPhoto
+              ? "Votre visage sera comparé à la photo enregistrée"
+              : "Passez la caméra pour confirmer votre présence"}
+          </Text>
+          <View style={{ height: 32 }} />
           <PrimaryButton
-            label="Ouvrir la caméra"
-            onPress={openCamera}
-            icon={<Camera size={18} color="#fff" weight="bold" />}
+            label="S'authentifier"
+            onPress={handleAuthenticate}
+            icon={<ScanFace size={18} color="#fff" weight="bold" />}
             fullWidth
           />
         </View>
       )}
 
-      {/* Comparing */}
-      {step === "comparing" && (
-        <View style={styles.center}>
-          {refPhoto && capturedPhoto && (
-            <View style={styles.compareRow}>
-              <View style={styles.compareBlock}>
-                <Text style={styles.label}>Référence</Text>
-                <Image source={{ uri: refPhoto }} style={styles.compareImg} />
-              </View>
-              <View style={styles.compareBlock}>
-                <Text style={styles.label}>Capturée</Text>
-                <Image source={{ uri: capturedPhoto }} style={styles.compareImg} />
-              </View>
-            </View>
-          )}
-          <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 20 }} />
-          <Text style={styles.hint}>Comparaison en cours...</Text>
-        </View>
-      )}
-
-      {/* Match */}
-      {step === "match" && (
-        <View style={styles.center}>
-          <View style={styles.iconCircleGreen}>
-            <CheckCircle size={48} color={theme.colors.success} weight="fill" />
-          </View>
-          <Text style={styles.successText}>Visage reconnu ✓</Text>
-          <Text style={styles.hint}>Pointage en cours...</Text>
-        </View>
-      )}
-
-      {/* No match */}
-      {step === "no-match" && (
-        <View style={styles.center}>
-          <View style={styles.iconCircleRed}>
-            <WarningCircle size={48} color={theme.colors.danger} weight="fill" />
-          </View>
-          <Text style={styles.errorText}>Visage non reconnu</Text>
-          {message && <Text style={styles.hint}>{message}</Text>}
-          <View style={{ height: 24 }} />
-          <PrimaryButton label="Réessayer" onPress={reset} fullWidth />
-          <View style={{ height: 12 }} />
-          <PrimaryButton label="Retour" variant="secondary" onPress={() => router.replace("/identification")} fullWidth />
-        </View>
-      )}
-
-      {/* Submitting */}
-      {step === "submitting" && (
+      {/* Camera opening */}
+      {step === "camera" && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.hint}>Envoi du pointage...</Text>
+          <Text style={styles.hint}>Ouverture de la caméra...</Text>
+        </View>
+      )}
+
+      {/* Comparing / Submitting */}
+      {step === "comparing" && (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+          <Text style={styles.hint}>Vérification en cours...</Text>
         </View>
       )}
 
       {/* Success */}
       {step === "success" && (
         <View style={styles.center}>
-          <View style={styles.iconCircleGreen}>
+          <View style={styles.iconGreen}>
             <CheckCircle size={48} color={theme.colors.success} weight="fill" />
           </View>
           <Text style={styles.successText}>Pointage enregistré</Text>
@@ -292,13 +238,13 @@ export default function BiometryScreen() {
       {/* Error */}
       {step === "error" && (
         <View style={styles.center}>
-          <View style={styles.iconCircleRed}>
+          <View style={styles.iconRed}>
             <WarningCircle size={48} color={theme.colors.danger} weight="fill" />
           </View>
           <Text style={styles.errorText}>Erreur</Text>
           {message && <Text style={styles.hint}>{message}</Text>}
           <View style={{ height: 24 }} />
-          <PrimaryButton label="Réessayer" onPress={reset} fullWidth />
+          <PrimaryButton label="Réessayer" onPress={() => { setMessage(null); setStep("ready"); }} fullWidth />
           <View style={{ height: 12 }} />
           <PrimaryButton label="Retour" variant="secondary" onPress={() => router.replace("/identification")} fullWidth />
         </View>
@@ -316,28 +262,23 @@ const styles = StyleSheet.create({
   backText: { color: theme.colors.textSecondary, fontSize: 15, fontWeight: "500" },
   center: {
     flex: 1, alignItems: "center", justifyContent: "center",
-    paddingHorizontal: 24, gap: 10,
+    paddingHorizontal: 24, gap: 8,
   },
-  // Reference
-  refBlock: { alignItems: "center", gap: 8 },
-  label: { color: theme.colors.textMuted, fontSize: 12, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
-  refImage: { width: 120, height: 120, borderRadius: 16, borderWidth: 2, borderColor: theme.colors.border },
-  dividerLine: { width: 40, height: 2, backgroundColor: theme.colors.border, borderRadius: 1, marginVertical: 16 },
-  // Text
-  title: { color: theme.colors.text, fontSize: 22, fontWeight: "800", textAlign: "center" },
-  subtitle: { color: theme.colors.textSecondary, fontSize: 15, textAlign: "center", marginTop: 4, lineHeight: 22 },
-  hint: { color: theme.colors.textMuted, fontSize: 13, textAlign: "center", marginTop: 4 },
-  // Compare
-  compareRow: { flexDirection: "row", gap: 20 },
-  compareBlock: { alignItems: "center", gap: 6 },
-  compareImg: { width: 120, height: 120, borderRadius: 16, borderWidth: 2, borderColor: theme.colors.border },
-  // Icons
-  iconCircleGreen: {
+  iconWrap: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: theme.colors.primary + "12",
+    alignItems: "center", justifyContent: "center",
+    marginBottom: 12,
+  },
+  title: { color: theme.colors.text, fontSize: 24, fontWeight: "800" },
+  subtitle: { color: theme.colors.textSecondary, fontSize: 16, fontWeight: "600", marginTop: 4 },
+  hint: { color: theme.colors.textMuted, fontSize: 14, textAlign: "center", marginTop: 4 },
+  iconGreen: {
     width: 80, height: 80, borderRadius: 40,
     backgroundColor: "rgba(16,185,129,0.1)", alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: "rgba(16,185,129,0.2)",
   },
-  iconCircleRed: {
+  iconRed: {
     width: 80, height: 80, borderRadius: 40,
     backgroundColor: "rgba(239,68,68,0.08)", alignItems: "center", justifyContent: "center",
     borderWidth: 1, borderColor: "rgba(239,68,68,0.15)",
