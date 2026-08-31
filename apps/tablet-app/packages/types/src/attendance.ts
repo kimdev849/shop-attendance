@@ -28,11 +28,13 @@ export interface CheckInResult {
   attendanceId: string;
   workerFullName: string;
   checkInTime: string;
+  checkOutTime: string | null;
   scheduledTime: string | null;
   latenessMinutes: number;
   status: AttendanceStatus;
   penaltyAmount: number | null;
   penaltyStatus: PenaltyStatus | null;
+  type: "CHECK_IN" | "CHECK_OUT";
 }
 
 export interface SyncAttendanceItem extends CheckInPayload {

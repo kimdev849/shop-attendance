@@ -17,7 +17,6 @@ import {
   ShieldCheck,
   Camera,
   XCircle,
-  ScanFace,
   Info,
 } from "phosphor-react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -86,7 +85,7 @@ export default function BiometryScreen() {
     let localUri: string | null = null;
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images" as const],
         quality: 0.7,
         base64: true,
         allowsEditing: false,
