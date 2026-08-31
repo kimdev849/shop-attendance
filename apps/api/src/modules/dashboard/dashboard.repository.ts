@@ -48,6 +48,10 @@ export class DashboardRepository {
   }
 
   async countDevices() {
-    return this.prisma.device.count();
+    try {
+      return await this.prisma.device.count();
+    } catch {
+      return 0;
+    }
   }
 }

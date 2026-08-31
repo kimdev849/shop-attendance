@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { DevicesRepository } from "./devices.repository";
 import { CreateDeviceDto } from "./dto/create-device.dto";
 import { UpdateDeviceDto } from "./dto/update-device.dto";
 
 @Injectable()
 export class DevicesService {
+  private readonly logger = new Logger(DevicesService.name);
+
   constructor(private readonly repository: DevicesRepository) {}
 
   async create(dto: CreateDeviceDto) {
@@ -12,36 +14,41 @@ export class DevicesService {
   }
 
   async findAll(params?: string | { search?: string; shopId?: string; status?: string; page?: number; limit?: number }) {
-    // Auto-mark stale devices before listing
-    await this.repository.markStaleDevicesOffline();
+    try {
+      // Auto-mark stale devices before listing
+      await this.repository.markStaleDevicesOffline();
 
-    if (typeof params === "string") {
-      return this.repository.findMany({ where: { shopId: params } });
+      if (typeof params === "string") {
+        return this.repository.findMany({ where: { shopId: params } });
+      }
+      const { page = 1, limit = 20 } = params ?? {};
+      const where: any = {};
+      if (params?.shopId) where.shopId = params.shopId;
+      if (params?.search) {
+        where.OR = [
+          { name: { contains: params.search, mode: "insensitive" } },
+          { deviceIdentifier: { contains: params.search, mode: "insensitive" } },
+        ];
+      }
+      if (params?.status) where.status = params.status;
+
+      const [data, total] = await Promise.all([
+        this.repository.findMany({ where, skip: (page - 1) * limit, take: limit }),
+        this.repository.count(where),
+      ]);
+
+      // Compute isStale for each device (no heartbeat in 5 min)
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const enriched = data.map((d: any) => ({
+        ...d,
+        isStale: d.status === "ONLINE" && (!d.lastHeartbeatAt || d.lastHeartbeatAt < fiveMinAgo),
+      }));
+
+      return { data: enriched, total, page, limit, totalPages: Math.ceil(total / limit) };
+    } catch (err: any) {
+      this.logger.error(`findAll failed: ${err?.message}`);
+      return { data: [], total: 0, page: params && typeof params !== "string" ? (params.page ?? 1) : 1, limit: params && typeof params !== "string" ? (params.limit ?? 20) : 20, totalPages: 0 };
     }
-    const { page = 1, limit = 20 } = params ?? {};
-    const where: any = {};
-    if (params?.shopId) where.shopId = params.shopId;
-    if (params?.search) {
-      where.OR = [
-        { name: { contains: params.search, mode: "insensitive" } },
-        { deviceIdentifier: { contains: params.search, mode: "insensitive" } },
-      ];
-    }
-    if (params?.status) where.status = params.status;
-
-    const [data, total] = await Promise.all([
-      this.repository.findMany({ where, skip: (page - 1) * limit, take: limit }),
-      this.repository.count(where),
-    ]);
-
-    // Compute isStale for each device (no heartbeat in 5 min)
-    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const enriched = data.map((d: any) => ({
-      ...d,
-      isStale: d.status === "ONLINE" && (!d.lastHeartbeatAt || d.lastHeartbeatAt < fiveMinAgo),
-    }));
-
-    return { data: enriched, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: string) {
