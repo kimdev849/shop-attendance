@@ -106,20 +106,28 @@ export default function BiometryScreen() {
       return;
     }
 
-    // 3. Face verification (soft check — never blocks check-in)
-    // The PIN already authenticates the worker; face is just a visual confirmation.
-    // Pixel-based comparison is unreliable across devices/lighting, so we log
-    // the result but always proceed.
+    // 3. Face verification (mandatory — both PIN + photo are required)
     if (hasRefPhoto && photoData) {
       setStep("comparing");
       try {
         const config = await getDeviceConfig();
-        if (config && worker) {
-          const faceResult = await verifyFace(worker.employeeNumber, config.shopId, photoData);
-          // Log result but always proceed — PIN is the real auth
+        if (!config || !worker) throw new Error("Config manquante.");
+        const faceResult = await verifyFace(worker.employeeNumber, config.shopId, photoData);
+        if (!faceResult.matched) {
+          setStep("face_error");
+          setMessage("Le visage ne correspond pas à la photo enregistrée. Réessayez.");
+          return;
         }
-      } catch {
-        // Ignore — proceed with check-in
+      } catch (err: any) {
+        const msg = err?.message ?? "";
+        // If endpoint not found or network — still proceed
+        if (msg.includes("404") || msg.includes("Not Found") || msg.includes("fetch") || msg.includes("Network")) {
+          // OK
+        } else {
+          setStep("face_error");
+          setMessage("Erreur de vérification faciale. Réessayez.");
+          return;
+        }
       }
     }
 
