@@ -127,6 +127,23 @@ export async function getFacePhotoForCheckIn(employeeNumber: string, shopId: str
   return safeJson(response);
 }
 
+/**
+ * Verify face by sending captured photo to server.
+ * Server compares with stored face descriptor.
+ */
+export async function verifyFace(employeeNumber: string, shopId: string, capturedPhoto: string) {
+  const response = await fetchWithTimeout(`${API_URL}/v1/workers/verify-face`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ employeeNumber, shopId, capturedPhoto }),
+  });
+  if (!response.ok) {
+    const body = await safeJson(response);
+    throw new Error(body.message ?? "Erreur de vérification faciale.");
+  }
+  return safeJson(response) as Promise<{ matched: boolean; distance?: number }>;
+}
+
 // ── Heartbeat ───────────────────────────────────────────────────────
 
 /**

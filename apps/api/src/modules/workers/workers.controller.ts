@@ -149,6 +149,16 @@ export class WorkersController {
   }
 
   @Public()
+  @Post("verify-face")
+  verifyFace(
+    @Body("employeeNumber") employeeNumber: string,
+    @Body("shopId") shopId: string,
+    @Body("capturedPhoto") capturedPhoto: string,
+  ) {
+    return this.workersService.verifyFace(employeeNumber, shopId, capturedPhoto);
+  }
+
+  @Public()
   @Post("face-photo-for-checkin")
   getFacePhotoForCheckIn(
     @Body("employeeNumber") employeeNumber: string,

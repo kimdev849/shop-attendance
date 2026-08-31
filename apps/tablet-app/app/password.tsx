@@ -1,12 +1,14 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -16,7 +18,6 @@ import {
   WarningCircle,
   Fingerprint,
 } from "phosphor-react-native";
-import { ScreenContainer } from "../components/screen-container";
 import { PrimaryButton } from "../components/primary-button";
 import { theme } from "../components/theme";
 import { getDeviceConfig } from "../storage/device-config";
@@ -35,13 +36,10 @@ export default function PasswordScreen() {
     if (!worker || pin.trim().length < 4) return;
     setError(null);
     setLoading(true);
-
+    Keyboard.dismiss();
     try {
       const config = await getDeviceConfig();
-      if (!config) {
-        setError("Tablette non configurée.");
-        return;
-      }
+      if (!config) { setError("Tablette non configurée."); return; }
       await verifyWorkerPin(worker.employeeNumber, config.shopId, pin.trim());
       router.push("/biometry");
     } catch (err: any) {
@@ -61,66 +59,52 @@ export default function PasswordScreen() {
 
   if (!worker) {
     return (
-      <ScreenContainer>
-        <View style={styles.centerWrap}>
-          <Text style={styles.emptyText}>Aucun collaborateur sélectionné.</Text>
-          <View style={{ height: 16 }} />
-          <PrimaryButton
-            label="Retour"
-            variant="secondary"
-            onPress={() => router.replace("/identification")}
-          />
-        </View>
-      </ScreenContainer>
+      <View style={styles.centerWrap}>
+        <Text style={styles.emptyText}>Aucun collaborateur sélectionné.</Text>
+        <View style={{ height: 16 }} />
+        <PrimaryButton label="Retour" variant="secondary" onPress={() => router.replace("/identification")} />
+      </View>
     );
   }
 
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
-        {/* Back */}
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <ArrowLeft size={20} color={theme.colors.textSecondary} weight="bold" />
-          <Text style={styles.backText}>Retour</Text>
-        </Pressable>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={[styles.container, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 }]}>
+          {/* Back */}
+          <Pressable style={styles.backBtn} onPress={() => router.back()}>
+            <ArrowLeft size={20} color={theme.colors.textSecondary} weight="bold" />
+            <Text style={styles.backText}>Retour</Text>
+          </Pressable>
 
-        {/* Content */}
-        <View style={styles.content}>
-          {/* Avatar */}
-          <View style={styles.avatar}>
-            <Text style={styles.initials}>
-              {worker.firstName.charAt(0)}{worker.lastName.charAt(0)}
-            </Text>
+          {/* Top section — avatar + title */}
+          <View style={styles.topSection}>
+            <View style={styles.avatar}>
+              <Text style={styles.initials}>
+                {worker.firstName.charAt(0)}{worker.lastName.charAt(0)}
+              </Text>
+            </View>
+            <Text style={styles.workerName}>{worker.firstName} {worker.lastName}</Text>
+            <Text style={styles.workerNumber}>{worker.employeeNumber}</Text>
+
+            <View style={styles.divider} />
+
+            <View style={styles.iconWrap}>
+              <Fingerprint size={28} color={theme.colors.primary} weight="fill" />
+            </View>
+            <Text style={styles.title}>Code PIN</Text>
+            <Text style={styles.subtitle}>Saisissez votre code à 4 chiffres</Text>
           </View>
 
-          <Text style={styles.workerName}>
-            {worker.firstName} {worker.lastName}
-          </Text>
-          <Text style={styles.workerNumber}>{worker.employeeNumber}</Text>
-
-          <View style={styles.divider} />
-
-          {/* Icon */}
-          <View style={styles.iconWrap}>
-            <Fingerprint size={28} color={theme.colors.primary} weight="fill" />
-          </View>
-
-          <Text style={styles.title}>Code PIN</Text>
-          <Text style={styles.subtitle}>
-            Saisissez votre code à 4 chiffres
-          </Text>
-
-          {/* PIN input */}
-          <View style={styles.inputWrap}>
+          {/* Middle — input */}
+          <View style={styles.middleSection}>
             <TextInput
               value={pin}
-              onChangeText={(t) => {
-                setPin(t.replace(/[^0-9]/g, "").slice(0, 6));
-                setError(null);
-              }}
+              onChangeText={(t) => { setPin(t.replace(/[^0-9]/g, "").slice(0, 6)); setError(null); }}
               placeholder="••••"
               placeholderTextColor={theme.colors.textMuted}
               secureTextEntry
@@ -130,41 +114,35 @@ export default function PasswordScreen() {
               style={styles.input}
               onSubmitEditing={handleVerify}
             />
+
+            {error && (
+              <View style={styles.errorBox}>
+                <WarningCircle size={16} color="#ef4444" weight="fill" />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
+            <Text style={styles.hint}>Demandez votre code à votre responsable</Text>
           </View>
 
-          {/* Error */}
-          {error && (
-            <View style={styles.errorBox}>
-              <WarningCircle size={16} color="#ef4444" weight="fill" />
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          )}
-
-          {/* Hint */}
-          <Text style={styles.hint}>
-            Demandez votre code à votre responsable
-          </Text>
-
-          <View style={{ flex: 1 }} />
-
-          {/* Submit — en bas, facile à cliquer */}
-          {loading ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator color={theme.colors.primary} size="large" />
-              <Text style={styles.loadingText}>Vérification...</Text>
-            </View>
-          ) : (
-            <PrimaryButton
-              label="Valider"
-              onPress={handleVerify}
-              disabled={pin.trim().length < 4}
-              fullWidth
-            />
-          )}
-
-          <View style={{ height: insets.bottom + 16 }} />
+          {/* Bottom — button always visible above keyboard */}
+          <View style={styles.bottomSection}>
+            {loading ? (
+              <View style={styles.loadingWrap}>
+                <ActivityIndicator color={theme.colors.primary} size="large" />
+                <Text style={styles.loadingText}>Vérification...</Text>
+              </View>
+            ) : (
+              <PrimaryButton
+                label="Valider"
+                onPress={handleVerify}
+                disabled={pin.trim().length < 4}
+                fullWidth
+              />
+            )}
+          </View>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
@@ -187,13 +165,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "500",
   },
-  content: {
-    flex: 1,
+  topSection: {
     alignItems: "center",
-    paddingHorizontal: 24,
     paddingTop: 8,
   },
-  // Avatar
   avatar: {
     width: 72,
     height: 72,
@@ -246,13 +221,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 6,
   },
-  // PIN input
-  inputWrap: {
-    width: "100%",
-    maxWidth: 280,
-    marginTop: 28,
+  middleSection: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
   },
   input: {
+    width: "100%",
+    maxWidth: 280,
     backgroundColor: theme.colors.surface,
     borderRadius: 14,
     borderWidth: 1.5,
@@ -265,7 +242,6 @@ const styles = StyleSheet.create({
     letterSpacing: 12,
     fontWeight: "600",
   },
-  // Error
   errorBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -277,6 +253,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderWidth: 1,
     borderColor: "rgba(239,68,68,0.15)",
+    maxWidth: 280,
   },
   errorText: {
     color: "#ef4444",
@@ -290,7 +267,10 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: "center",
   },
-  // Loading
+  bottomSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 8,
+  },
   loadingWrap: {
     alignItems: "center",
     gap: 10,
@@ -299,7 +279,6 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 14,
   },
-  // Empty
   centerWrap: {
     flex: 1,
     alignItems: "center",
