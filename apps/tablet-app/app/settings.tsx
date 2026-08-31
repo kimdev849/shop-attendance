@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,8 +16,6 @@ import {
   GearSix,
   FloppyDisk,
   ArrowsClockwise,
-  House,
-  DeviceMobile,
   ArrowLeft,
   MagnifyingGlass,
   CheckCircle,
@@ -26,6 +23,8 @@ import {
   X,
   WarningCircle,
   WifiSlash,
+  DeviceMobile,
+  Trash,
 } from "phosphor-react-native";
 import { ScreenContainer } from "../components/screen-container";
 import { PrimaryButton } from "../components/primary-button";
@@ -33,6 +32,7 @@ import { theme } from "../components/theme";
 import {
   getDeviceConfig,
   setDeviceConfig,
+  clearDeviceConfig,
   DeviceConfig,
 } from "../storage/device-config";
 import { queueSize } from "../storage/attendance-queue";
@@ -137,10 +137,19 @@ export default function SettingsScreen() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: any) {
-      setError(err?.message ?? "Impossible de trouver la tablette. Vérifiez le nom et le shop, ou créez-la depuis le dashboard admin.");
+      setError(err?.message ?? "Tablette introuvable. Créez-la d'abord depuis le dashboard admin.");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleReconfigure() {
+    await clearDeviceConfig();
+    setExistingConfig(null);
+    setDeviceName("");
+    setSelectedShop(null);
+    setPending(0);
+    setError("");
   }
 
   return (
@@ -171,8 +180,32 @@ export default function SettingsScreen() {
             </Text>
           </View>
 
+          {/* Current config info */}
+          {existingConfig && (
+            <View style={styles.configCard}>
+              <View style={styles.configRow}>
+                <DeviceMobile size={16} color={theme.colors.primary} weight="bold" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.configTitle}>Tablette configurée</Text>
+                  <Text style={styles.configMeta}>
+                    {existingConfig.deviceName} · {existingConfig.shopName}
+                  </Text>
+                </View>
+                <CheckCircle size={16} color={theme.colors.success} weight="fill" />
+              </View>
+              <View style={{ height: 10 }} />
+              <PrimaryButton
+                label="Reconfigurer"
+                variant="secondary"
+                onPress={handleReconfigure}
+                icon={<ArrowsClockwise size={14} color={theme.colors.textSecondary} weight="bold" />}
+                fullWidth
+              />
+            </View>
+          )}
+
           {/* Shop selector */}
-          <Text style={styles.label}>Point de vente *</Text>
+          <Text style={[styles.label, existingConfig && { marginTop: 20 }]}>Point de vente *</Text>
           {selectedShop ? (
             <View style={styles.selectedCard}>
               <View style={styles.selectedRow}>
@@ -269,7 +302,7 @@ export default function SettingsScreen() {
             fullWidth
           />
 
-          {/* Sync */}
+          {/* Sync — only when configured */}
           {existingConfig && (
             <>
               <Text style={[styles.label, { marginTop: 24 }]}>Synchronisation</Text>
@@ -294,15 +327,6 @@ export default function SettingsScreen() {
               </View>
             </>
           )}
-
-          <View style={{ height: 16 }} />
-          <PrimaryButton
-            label="Retour à l'accueil"
-            variant="secondary"
-            onPress={() => router.replace("/")}
-            icon={<House size={15} color={theme.colors.textSecondary} weight="bold" />}
-            fullWidth
-          />
         </ScrollView>
       </TouchableWithoutFeedback>
     </ScreenContainer>
@@ -365,6 +389,30 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  // Config card
+  configCard: {
+    backgroundColor: theme.colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "rgba(16,185,129,0.3)",
+    marginBottom: 4,
+  },
+  configRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  configTitle: {
+    color: theme.colors.text,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  configMeta: {
+    color: theme.colors.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
   },
   // Search
   searchRow: {
