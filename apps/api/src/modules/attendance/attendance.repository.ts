@@ -88,14 +88,6 @@ export class AttendanceRepository {
     });
   }
 
-  async updateCheckOut(id: string, checkOutTime: Date) {
-    return this.prisma.attendance.update({
-      where: { id },
-      data: { checkOutTime },
-      include: { worker: true, penalty: true },
-    });
-  }
-
   async findWorkerById(id: string) {
     return this.prisma.worker.findUnique({ where: { id } });
   }
