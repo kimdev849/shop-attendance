@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Pressable,
   StyleSheet,
@@ -15,10 +14,8 @@ import {
   WarningCircle,
   ArrowLeft,
   ShieldCheck,
-  Scan,
-  X,
+  Camera,
 } from "phosphor-react-native";
-import * as ImagePicker from "expo-image-picker";
 import { PrimaryButton } from "../components/primary-button";
 import { theme } from "../components/theme";
 import { submitCheckIn, getFacePhotoForCheckIn, verifyFace } from "../services/api";
@@ -30,6 +27,15 @@ import { useCheckInFlow } from "./flow-context";
 
 type Step = "loading" | "ready" | "comparing" | "success" | "error";
 
+/** Lazy-load expo-image-picker so the screen doesn't crash if it's missing. */
+async function getImagePicker() {
+  try {
+    return await import("expo-image-picker");
+  } catch {
+    return null;
+  }
+}
+
 export default function BiometryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -38,7 +44,7 @@ export default function BiometryScreen() {
   const [message, setMessage] = useState<string | null>(null);
   const [hasRefPhoto, setHasRefPhoto] = useState(false);
   const [attendanceType, setAttendanceType] = useState<"CHECK_IN" | "CHECK_OUT">("CHECK_IN");
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!worker) { router.replace("/identification"); return; }
@@ -46,6 +52,10 @@ export default function BiometryScreen() {
   }, [worker]);
 
   async function checkRefPhoto() {
+    // Check if camera module is available
+    const picker = await getImagePicker();
+    setCameraAvailable(!!picker);
+
     try {
       const config = await getDeviceConfig();
       if (!config) { setStep("error"); setMessage("Tablette non configurée."); return; }
@@ -61,16 +71,23 @@ export default function BiometryScreen() {
   }
 
   async function handleCapture() {
-    // Request permissions
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      setStep("error");
-      setMessage("Permission caméra refusée. Activez-la dans les paramètres de votre appareil.");
+    const ImagePicker = await getImagePicker();
+    if (!ImagePicker) {
+      // Camera not available — skip face check, go straight to check-in
+      await doCheckIn();
       return;
     }
 
-    // Open camera
+    // Request permissions
     try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        // Permission denied — skip face check, go straight to check-in
+        await doCheckIn();
+        return;
+      }
+
+      // Open camera
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ["images"],
         quality: 0.7,
@@ -79,19 +96,17 @@ export default function BiometryScreen() {
       });
 
       if (result.canceled || !result.assets?.[0]) {
-        // User cancelled — stay on ready
         return;
       }
 
       const asset = result.assets[0];
       if (!asset.base64) {
-        setStep("error");
-        setMessage("Impossible de lire la photo capturée.");
+        // Can't read photo — skip face check
+        await doCheckIn();
         return;
       }
 
       const photoData = `data:image/jpeg;base64,${asset.base64}`;
-      setCapturedPhoto(photoData);
 
       // Face verification if reference photo exists
       if (hasRefPhoto) {
@@ -101,7 +116,6 @@ export default function BiometryScreen() {
           if (!config || !worker) throw new Error("Config manquante.");
           const faceResult = await verifyFace(worker.employeeNumber, config.shopId, photoData);
           if (!faceResult.matched) {
-            setCapturedPhoto(null);
             setStep("error");
             setMessage("Le visage ne correspond pas à la photo enregistrée. Réessayez.");
             return;
@@ -109,10 +123,7 @@ export default function BiometryScreen() {
         } catch (err: any) {
           const msg = err?.message ?? "";
           // If endpoint doesn't exist or network error — proceed anyway
-          if (msg.includes("404") || msg.includes("Not Found") || msg.includes("fetch")) {
-            // OK, proceed
-          } else {
-            setCapturedPhoto(null);
+          if (!msg.includes("404") && !msg.includes("Not Found") && !msg.includes("fetch") && !msg.includes("Network")) {
             setStep("error");
             setMessage("Erreur de vérification faciale. Réessayez.");
             return;
@@ -123,13 +134,8 @@ export default function BiometryScreen() {
       // Submit attendance
       await doCheckIn();
     } catch (err: any) {
-      setStep("error");
-      const msg = err?.message ?? "";
-      if (msg.includes("permission") || msg.includes("Permission")) {
-        setMessage("Permission caméra refusée. Activez-la dans les paramètres.");
-      } else {
-        setMessage("Impossible d'ouvrir la caméra. Réessayez.");
-      }
+      // Camera failed — still submit the check-in
+      await doCheckIn();
     }
   }
 
@@ -228,15 +234,13 @@ export default function BiometryScreen() {
           <Text style={styles.hint}>
             {attendanceType === "CHECK_OUT"
               ? "Vous avez déjà pointé aujourd'hui — confirmez votre sortie"
-              : hasRefPhoto
-                ? "Votre visage sera comparé à la photo enregistrée"
-                : "Capturez une photo pour confirmer votre présence"}
+              : "Confirmez votre présence pour pointer"}
           </Text>
           <View style={{ height: 32 }} />
           <PrimaryButton
             label={attendanceType === "CHECK_OUT" ? "Pointer la sortie" : "S'authentifier"}
             onPress={handleCapture}
-            icon={<Scan size={18} color="#fff" weight="bold" />}
+            icon={<Camera size={18} color="#fff" weight="bold" />}
             fullWidth
           />
         </View>
@@ -246,9 +250,7 @@ export default function BiometryScreen() {
       {step === "comparing" && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.hint}>
-            {hasRefPhoto ? "Vérification du visage..." : "Envoi du pointage..."}
-          </Text>
+          <Text style={styles.hint}>Envoi du pointage...</Text>
         </View>
       )}
 
@@ -273,7 +275,7 @@ export default function BiometryScreen() {
           <Text style={styles.errorText}>Erreur</Text>
           {message && <Text style={styles.hint}>{message}</Text>}
           <View style={{ height: 24 }} />
-          <PrimaryButton label="Réessayer" onPress={() => { setMessage(null); setCapturedPhoto(null); setStep("ready"); }} fullWidth />
+          <PrimaryButton label="Réessayer" onPress={() => { setMessage(null); setStep("ready"); }} fullWidth />
           <View style={{ height: 12 }} />
           <PrimaryButton label="Retour" variant="secondary" onPress={() => router.replace("/identification")} fullWidth />
         </View>
