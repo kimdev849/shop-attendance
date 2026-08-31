@@ -1,6 +1,9 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -8,11 +11,11 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  User,
-  LockSimple,
-  WarningCircle,
   ArrowLeft,
+  WarningCircle,
+  Fingerprint,
 } from "phosphor-react-native";
 import { ScreenContainer } from "../components/screen-container";
 import { PrimaryButton } from "../components/primary-button";
@@ -21,247 +24,387 @@ import { getDeviceConfig } from "../storage/device-config";
 import { verifyWorkerPin } from "../services/api";
 import { useCheckInFlow } from "./flow-context";
 
+const PIN_LENGTH = 4;
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
 export default function PasswordScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { worker } = useCheckInFlow();
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
 
   async function handleVerify() {
-    if (!worker || !pin.trim()) return;
+    if (!worker || pin.length < PIN_LENGTH) return;
     setError(null);
     setLoading(true);
 
     try {
       const config = await getDeviceConfig();
       if (!config) {
-        setError("Tablette non configuree.");
+        setError("Tablette non configurée.");
         return;
       }
-
       await verifyWorkerPin(worker.employeeNumber, config.shopId, pin.trim());
       router.push("/biometry");
     } catch (err: any) {
-      const msg = err?.message ?? "Mot de passe incorrect.";
+      const msg = err?.message ?? "Code PIN incorrect.";
       if (msg.includes("Aucun mot de passe")) {
-        setError("Aucun code PIN n'a été défini. Contactez votre responsable pour en créer un.");
+        setError("Aucun code PIN défini. Contactez votre responsable.");
       } else if (msg.includes("incorrect")) {
-        setError("Code PIN incorrect. Réessayez ou contactez votre responsable.");
+        setError("Code PIN incorrect. Réessayez.");
       } else {
         setError(msg);
       }
+      // Shake animation
+      setShake(true);
+      setPin("");
+      setTimeout(() => setShake(false), 500);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function handlePinChange(text: string) {
+    // Only allow digits
+    const cleaned = text.replace(/[^0-9]/g, "").slice(0, PIN_LENGTH);
+    setPin(cleaned);
+    setError(null);
+
+    // Auto-submit when full
+    if (cleaned.length === PIN_LENGTH) {
+      setTimeout(() => {
+        setPin(cleaned);
+        // Trigger verify
+      }, 200);
     }
   }
 
   if (!worker) {
     return (
       <ScreenContainer>
-        <Text style={styles.error}>Aucun travailleur selectionne.</Text>
-        <View style={{ height: 16 }} />
-        <PrimaryButton
-          label="Retour"
-          variant="secondary"
-          onPress={() => router.replace("/identification")}
-        />
+        <View style={styles.centerWrap}>
+          <Text style={styles.emptyText}>Aucun collaborateur sélectionné.</Text>
+          <View style={{ height: 16 }} />
+          <PrimaryButton
+            label="Retour"
+            variant="secondary"
+            onPress={() => router.replace("/identification")}
+          />
+        </View>
       </ScreenContainer>
     );
   }
 
   return (
-    <ScreenContainer>
-      <Pressable style={styles.backButton} onPress={() => router.back()}>
-        <ArrowLeft size={20} color={theme.colors.textMuted} weight="bold" />
-        <Text style={styles.backText}>Retour</Text>
-      </Pressable>
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
+        {/* Back button */}
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <ArrowLeft size={20} color={theme.colors.textSecondary} weight="bold" />
+          <Text style={styles.backText}>Retour</Text>
+        </Pressable>
 
-      {/* Worker badge */}
-      <View style={styles.workerBadge}>
-        <View style={styles.workerAvatar}>
-          <User size={22} color={theme.colors.primaryLight} weight="bold" />
-        </View>
-        <View style={styles.workerInfo}>
+        {/* Content */}
+        <View style={styles.content}>
+          {/* Avatar */}
+          <View style={styles.avatarLarge}>
+            <Text style={styles.avatarInitials}>
+              {worker.firstName.charAt(0)}{worker.lastName.charAt(0)}
+            </Text>
+          </View>
+
+          {/* Worker name */}
           <Text style={styles.workerName}>
             {worker.firstName} {worker.lastName}
           </Text>
           <Text style={styles.workerNumber}>{worker.employeeNumber}</Text>
+
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* PIN icon */}
+          <View style={styles.iconWrap}>
+            <Fingerprint size={28} color={theme.colors.primary} weight="fill" />
+          </View>
+
+          {/* Title */}
+          <Text style={styles.title}>Code PIN</Text>
+          <Text style={styles.subtitle}>
+            Entrez votre code à {PIN_LENGTH} chiffres
+          </Text>
+
+          {/* PIN dots */}
+          <View style={[styles.dotsRow, shake && styles.dotsShake]}>
+            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.dot,
+                  i < pin.length && styles.dotFilled,
+                  error && styles.dotError,
+                ]}
+              >
+                {i < pin.length && <View style={styles.dotInner} />}
+              </View>
+            ))}
+          </View>
+
+          {/* Error */}
+          {error && (
+            <View style={styles.errorBox}>
+              <WarningCircle size={16} color="#ef4444" weight="fill" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {/* Hidden input for keyboard */}
+          <TextInput
+            value={pin}
+            onChangeText={handlePinChange}
+            keyboardType="number-pad"
+            maxLength={PIN_LENGTH}
+            autoFocus
+            style={styles.hiddenInput}
+            onSubmitEditing={handleVerify}
+          />
+
+          {/* Number pad */}
+          <View style={styles.numpad}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+              <Pressable
+                key={num}
+                style={({ pressed }) => [styles.numKey, pressed && styles.numKeyPressed]}
+                onPress={() => handlePinChange(pin + String(num))}
+              >
+                <Text style={styles.numText}>{num}</Text>
+              </Pressable>
+            ))}
+            <View style={styles.numKey} />
+            <Pressable
+              style={({ pressed }) => [styles.numKey, pressed && styles.numKeyPressed]}
+              onPress={() => handlePinChange(pin + "0")}
+            >
+              <Text style={styles.numText}>0</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.numKey, pressed && styles.numKeyPressed]}
+              onPress={() => setPin(pin.slice(0, -1))}
+            >
+              <Text style={styles.numText}>⌫</Text>
+            </Pressable>
+          </View>
+
+          {/* Submit */}
+          {loading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color={theme.colors.primary} size="large" />
+              <Text style={styles.loadingText}>Vérification...</Text>
+            </View>
+          ) : (
+            <PrimaryButton
+              label="Valider"
+              onPress={handleVerify}
+              disabled={pin.length < PIN_LENGTH}
+              fullWidth
+            />
+          )}
         </View>
       </View>
-
-      <View style={{ height: 28 }} />
-
-      <View style={styles.iconCircle}>
-        <LockSimple size={26} color={theme.colors.primaryLight} weight="bold" />
-      </View>
-
-      <Text style={styles.title}>Code PIN</Text>
-      <Text style={styles.subtitle}>
-        Entrez votre code personnel pour confirmer votre pointage
-      </Text>
-
-      <View style={{ height: 24 }} />
-
-      <View style={styles.inputCard}>
-        <TextInput
-          value={pin}
-          onChangeText={(t) => {
-            setPin(t);
-            setError(null);
-          }}
-          placeholder="\u2022\u2022\u2022\u2022"
-          placeholderTextColor={theme.colors.textMuted}
-          secureTextEntry
-          autoFocus
-          style={styles.input}
-          onSubmitEditing={handleVerify}
-          keyboardType="number-pad"
-          maxLength={8}
-        />
-      </View>
-
-      {error && (
-        <View style={styles.errorBox}>
-          <WarningCircle size={16} color={theme.colors.danger} weight="fill" />
-          <Text style={styles.error}>{error}</Text>
-        </View>
-      )}
-
-      <View style={{ height: 28 }} />
-
-      {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator color={theme.colors.primary} size="large" />
-          <Text style={styles.loadingText}>Verification...</Text>
-        </View>
-      ) : (
-        <PrimaryButton
-          label="Valider"
-          onPress={handleVerify}
-          disabled={pin.length < 4}
-          fullWidth
-        />
-      )}
-    </ScreenContainer>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  backButton: {
-    position: "absolute",
-    top: 16,
-    left: 20,
+  flex: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  backBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
   },
   backText: {
-    color: theme.colors.textMuted,
-    fontSize: 14,
+    color: theme.colors.textSecondary,
+    fontSize: 15,
+    fontWeight: "500",
   },
-  workerBadge: {
-    flexDirection: "row",
+  content: {
+    flex: 1,
     alignItems: "center",
-    backgroundColor: theme.colors.surface,
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    width: "100%",
-    maxWidth: 360,
-    ...theme.shadow,
+    paddingHorizontal: 24,
+    paddingTop: 12,
   },
-  workerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.surfaceAlt,
+  // Avatar
+  avatarLarge: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: theme.colors.primary + "18",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: theme.colors.primary + "30",
   },
-  workerInfo: {
-    marginLeft: 14,
+  avatarInitials: {
+    color: theme.colors.primary,
+    fontSize: 24,
+    fontWeight: "800",
   },
   workerName: {
     color: theme.colors.text,
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: "700",
   },
   workerNumber: {
     color: theme.colors.textMuted,
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: 14,
+    marginTop: 4,
   },
-  iconCircle: {
+  divider: {
+    width: 40,
+    height: 2,
+    backgroundColor: theme.colors.border,
+    borderRadius: 1,
+    marginVertical: 20,
+  },
+  // Icon + title
+  iconWrap: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: theme.colors.surfaceAlt,
+    backgroundColor: theme.colors.primary + "12",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  title: {
+    color: theme.colors.text,
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  subtitle: {
+    color: theme.colors.textSecondary,
+    fontSize: 15,
+    marginTop: 6,
+  },
+  // PIN dots
+  dotsRow: {
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 32,
+    marginBottom: 24,
+  },
+  dotsShake: {
+    // @ts-ignore
+    animation: "shake 0.5s",
+  },
+  dot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dotFilled: {
+    borderColor: theme.colors.primary,
+    backgroundColor: theme.colors.primary + "15",
+  },
+  dotError: {
+    borderColor: "#ef4444",
+  },
+  dotInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.colors.primary,
+  },
+  // Error
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(239,68,68,0.08)",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "rgba(239,68,68,0.15)",
+    marginBottom: 8,
+  },
+  errorText: {
+    color: "#ef4444",
+    fontSize: 13,
+    flex: 1,
+    textAlign: "center",
+  },
+  // Hidden input
+  hiddenInput: {
+    position: "absolute",
+    opacity: 0,
+    width: 1,
+    height: 1,
+  },
+  // Numpad
+  numpad: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 12,
+    width: SCREEN_WIDTH * 0.75,
+    maxWidth: 300,
+    marginBottom: 24,
+  },
+  numKey: {
+    width: 72,
+    height: 56,
+    borderRadius: 14,
+    backgroundColor: theme.colors.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
-  title: {
+  numKeyPressed: {
+    opacity: 0.6,
+    backgroundColor: theme.colors.surfaceAlt,
+  },
+  numText: {
     color: theme.colors.text,
     fontSize: 22,
-    fontWeight: "700",
-    textAlign: "center",
-    marginTop: 14,
-  },
-  subtitle: {
-    color: theme.colors.textMuted,
-    fontSize: 14,
-    textAlign: "center",
-    marginTop: 6,
-  },
-  inputCard: {
-    width: "100%",
-    maxWidth: 320,
-    backgroundColor: theme.colors.input,
-    borderRadius: theme.radius,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-  },
-  input: {
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    fontSize: 22,
-    color: theme.colors.text,
-    textAlign: "center",
-    letterSpacing: 8,
     fontWeight: "600",
   },
-  errorBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 14,
-    backgroundColor: "rgba(239,68,68,0.08)",
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    maxWidth: 320,
-    borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.15)",
-  },
-  error: {
-    color: theme.colors.danger,
-    fontSize: 13,
-    lineHeight: 18,
-    flex: 1,
-  },
+  // Loading
   loadingWrap: {
     alignItems: "center",
     gap: 10,
   },
   loadingText: {
     color: theme.colors.textMuted,
-    fontSize: 13,
+    fontSize: 14,
+  },
+  // Empty state
+  centerWrap: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  emptyText: {
+    color: theme.colors.textMuted,
+    fontSize: 15,
+    textAlign: "center",
   },
 });
