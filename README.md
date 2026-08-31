@@ -1,266 +1,232 @@
 # 🏪 ShopAttendance
 
-Plateforme de gestion de présence, ponctualité et pénalités pour des travailleurs répartis dans plusieurs shops.
+**Système de gestion de présence pour entreprises multi-sites.**
+
+ShopAttendance permet aux entreprises de suivre les présences, retards et absences de leurs employés répartis dans plusieurs points de vente (shops), à l'aide de tablettes installées sur site.
 
 ---
 
-## 🏗️ Architecture
+## 🎯 À quoi ça sert ?
+
+### Le problème
+
+Une entreprise avec 10 boutiques veut savoir qui pointe à quelle heure, qui est en retard, qui est absent. Aujourd'hui, c'est fait à la main ou avec des systèmes obsolètes qui ne fonctionnent pas hors-ligne.
+
+### La solution
+
+Des **tablettes Android** placées à l'entrée de chaque shop permettent aux employés de **pointer en moins de 5 secondes** :
+1. Chercher son nom sur l'écran
+2. Entrer son code PIN
+3. Regarder la caméra (vérification faciale)
+4. C'est pointé ✅
+
+L'**admin** suit tout en temps réel sur un **dashboard web** : présences, retards, absences, statistiques par shop.
+
+---
+
+## 🔄 Le flux complet
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    FRONTEND (Next.js)                    │
-│              admin-dashboard.vercel.app                  │
-│                                                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐  │
-│  │ Workers  │  │Attendance│  │Penalties │  │ Reports│  │
-│  └──────────┘  └──────────┘  └──────────┘  └────────┘  │
-└───────────────────────────┬─────────────────────────────┘
-                            │ HTTPS
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│                     API (NestJS)                         │
-│              shop-attendance-api.onrender.com             │
-│                                                          │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │                  modules/                           │ │
-│  │  ┌──────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │ │
-│  │  │ Auth │ │ Workers  │ │Attendance│ │Penalties │  │ │
-│  │  ├──────┤ ├──────────┤ ├──────────┤ ├──────────┤  │ │
-│  │  │Shops │ │ Devices  │ │Schedules │ │ Absences │  │ │
-│  │  ├──────┤ ├──────────┤ ├──────────┤ ├──────────┤  │ │
-│  │  │Audit │ │ Dashboard│ │ Reports  │ │  Sync    │  │ │
-│  │  └──────┘ └──────────┘ └──────────┘ └──────────┘  │ │
-│  └────────────────────────────────────────────────────┘ │
-│                                                          │
-│  Controller → Service → Repository → Prisma → Neon      │
-└───────────────────────────┬─────────────────────────────┘
-                            │ Prisma
-                            ▼
-┌─────────────────────────────────────────────────────────┐
-│               Neon PostgreSQL Database                   │
-│                  shop-attendance-db                      │
-└─────────────────────────────────────────────────────────┘
-                            ▲
-                            │ HTTPS
-┌───────────────────────────┴─────────────────────────────┐
-│               TABLET APP (Expo / React Native)           │
-│                                                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐  │
-│  │ Check-in │  │Biometrics│  │  Sync    │  │ Workers│  │
-│  └──────────┘  └──────────┘  └──────────┘  └────────┘  │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        CÔTÉ ADMIN                                │
+│                                                                  │
+│  1. Créer les shops (Boutique A, Boutique B...)                 │
+│  2. Ajouter les travailleurs (nom, matricule, shop)             │
+│  3. Définir les codes PIN pour chaque employé                   │
+│  4. Enregistrer la photo de référence (détection faciale)        │
+│  5. Créer les tablettes (nom + shop lié)                        │
+│  6. Suivre les stats sur le dashboard                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     CÔTÉ TABLETTE                                │
+│                                                                  │
+│  1. Configurer la tablette (nom + shop)                         │
+│  2. L'employé arrive → cherche son nom                           │
+│  3. Entre son code PIN                                           │
+│  4. La caméra vérifie son visage                                │
+│  5. Pointage enregistré ✅                                      │
+│  6. Fonctionne hors-ligne (sync automatique)                    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     CÔTÉ ADMIN (dashboard)                       │
+│                                                                  │
+│  • Voir qui est présent / absent / en retard par shop           │
+│  • Historique des pointages                                      │
+│  • Statistiques (taux de ponctualité, retards, absences)        │
+│  • Gestion des pénalités pour retards/absences                  │
+│  • Rapports exportables                                         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📦 Tech Stack
+## 🏗️ Architecture technique
 
-| Couche | Technologie | Déploiement |
-|--------|------------|-------------|
-| **Frontend** | Next.js 15 + React 19 + Tailwind CSS | Render (Web Service) |
-| **API** | NestJS + Prisma + PostgreSQL | Render (Web Service) |
-| **Database** | PostgreSQL | Neon (managed) |
-| **Tablet** | Expo / React Native | Expo Go / EAS Build |
+```
+┌──────────────────────────┐
+│    Dashboard Web         │  ← Admin gère les employés, voit les stats
+│    (Next.js / React)     │
+└────────────┬─────────────┘
+             │ HTTPS (API REST)
+             ▼
+┌──────────────────────────┐
+│    API Backend           │  ← Logique métier, auth, données
+│    (NestJS + Prisma)     │
+└────────────┬─────────────┘
+             │ Prisma ORM
+             ▼
+┌──────────────────────────┐
+│    Base de données       │  ← PostgreSQL managed (Neon)
+│    (Neon PostgreSQL)     │
+└──────────────────────────┘
+             ▲
+             │ HTTPS (API REST)
+┌────────────┴─────────────┐
+│    App Tablette          │  ← Employés pointent sur place
+│    (Expo / React Native) │
+└──────────────────────────┘
+```
+
+### Stack technique
+
+| Composant | Technologie | Rôle |
+|-----------|------------|------|
+| **Dashboard** | Next.js 15 + Tailwind CSS | Interface admin web |
+| **API** | NestJS + Prisma | Backend REST, logique métier |
+| **Base de données** | PostgreSQL (Neon) | Stockage des données |
+| **Tablette** | Expo (React Native) | App mobile de pointage |
+| **Auth** | JWT (access + refresh tokens) | Sécurité des endpoints |
+| **Détection faciale** | face-api.js (dashboard) + comparaison serveur | Vérification d'identité |
+| **Déploiement** | Render (API + Dashboard) + Expo Go | Hébergement |
 
 ---
 
-## 🚀 Démarrage Rapide
+## 📱 Les 3 apps du projet
+
+### 1. Dashboard Admin (`apps/admin-dashboard`)
+
+L'interface web pour les administrateurs :
+- **Dashboard** : stats en temps réel (présences, retards, absences, tablettes)
+- **Travailleurs** : créer/modifier/supprimer des employés, définir PIN, enregistrer photo faciale
+- **Appareils** : gérer les tablettes (créer, voir le statut online/offline)
+- **Présence** : historique des pointages avec filtres
+- **Pénalités** : gérer les retards et absences
+
+### 2. API Backend (`apps/api`)
+
+Le serveur qui centralise toutes les données :
+- **Auth** : login, refresh token, rôles (ADMIN)
+- **Workers** : CRUD travailleurs, recherche par nom, vérification PIN
+- **Attendance** : pointage (check-in/check-out), historique
+- **Devices** : enregistrement tablettes, heartbeat, statut online/offline
+- **Dashboard** : statistiques agrégées
+- **Penalties** : système de pénalités pour retards/absences
+- **Sync** : synchronisation hors-ligne
+
+### 3. App Tablette (`apps/tablet-app`)
+
+L'application mobile installée sur les tablettes Android :
+- **Configuration** : lier la tablette au shop créé sur le dashboard
+- **Identification** : recherche par nom dans les employés du shop
+- **Code PIN** : vérification du code à 4 chiffres
+- **Biométrie** : capture photo → comparaison avec la photo de référence
+- **Pointage** : envoi au serveur (ou sync automatique si hors-ligne)
+
+---
+
+## 🚀 Démarrage rapide
 
 ### Prérequis
-
-- Node.js >= 20.0.0
-- npm >= 10.0.0
-- Git
+- Node.js >= 20
+- npm >= 10
 
 ### Installation
 
 ```bash
-# Cloner le projet
-git clone https://github.com/TON_UTILISATEUR/shop-attendance.git
+# Cloner
+git clone <url-du-repo>
 cd shop-attendance
 
 # Installer les dépendances
 npm install
 
 # Générer le client Prisma
-cd apps/api && npx prisma generate && cd ../..
+npx prisma generate --workspace=apps/api
 
 # Lancer en développement
-npm run dev:api      # Terminal 1 : API sur http://localhost:3001
-npm run dev:dashboard # Terminal 2 : Frontend sur http://localhost:3000
+npm run dev:api        # API sur http://localhost:3001
+npm run dev:dashboard  # Dashboard sur http://localhost:3000
 ```
 
-### Déploiement
-
-Voir **[DEPLOYMENT.md](./DEPLOYMENT.md)** pour le guide complet.
-
-```bash
-# Résumé rapide :
-./deploy.sh all           # Préparer les fichiers
-git add . && git commit -m "Deploy" && git push  # Pousser
-# Puis créer les services sur Render
-```
-
----
-
-## 📁 Structure du Code
-
-### Backend (`apps/api/src/modules/`)
-
-```
-modules/
-├── auth/           # Authentification JWT
-│   ├── auth.module.ts
-│   ├── auth.controller.ts
-│   ├── auth.service.ts
-│   ├── auth.repository.ts
-│   └── dto/
-│
-├── workers/        # Gestion des travailleurs
-│   ├── workers.module.ts
-│   ├── workers.controller.ts
-│   ├── workers.service.ts
-│   ├── workers.repository.ts
-│   ├── dto/
-│   ├── types/
-│   └── constants/
-│
-├── attendance/     # Pointage et présence
-│   ├── attendance.module.ts
-│   ├── attendance.controller.ts
-│   ├── attendance.service.ts
-│   ├── attendance.repository.ts
-│   ├── dto/
-│   ├── types/
-│   └── constants/
-│
-├── penalties/      # Système de pénalités
-├── shops/          # Gestion des shops
-├── devices/        # Tablets
-├── schedules/      # Horaires
-├── absences/       # Absences
-├── reports/        # Rapports
-├── dashboard/      # Stats dashboard
-├── audit/          # Journal d'audit
-├── sync/           # Synchronisation offline
-└── notifications/  # Notifications
-```
-
-### Frontend (`apps/admin-dashboard/`)
-
-```
-├── app/            # Pages Next.js
-│   ├── login/
-│   ├── dashboard/
-│   ├── workers/
-│   ├── attendance/
-│   ├── penalties/
-│   └── ...
-│
-├── features/       # Features métier
-│   ├── workers/api.ts
-│   ├── attendance/api.ts
-│   ├── penalties/api.ts
-│   ├── shops/api.ts
-│   └── auth/api.ts
-│
-├── components/     # Composants UI
-│   ├── ui/         # Button, Card, Table...
-│   ├── layout/     # Shell, Sidebar, Header
-│   └── charts/     # Graphiques
-│
-└── lib/            # Utilitaires
-    ├── api.ts      # Client API axios
-    ├── auth.tsx    # Context auth
-    └── utils.ts    # Helpers
-```
-
----
-
-## 🔑 Comptes de Test
-
-Après avoir lancé le seed (`npm run db:seed`) :
+### Compte de test
 
 | Rôle | Email | Mot de passe |
 |------|-------|-------------|
 | Admin | admin@shopattendance.local | Admin123! |
-| Travailleur | (matricule) | 1234 (PIN) |
 
 ---
 
-## 📚 API Documentation
+## 📁 Structure du projet
 
-L'API est documentée via Swagger :
-
-- **URL** : `https://shop-attendance-api.onrender.com/docs`
-- **Version** : v1
-- **Auth** : Bearer Token (JWT)
-
-### Routes principales
-
-| Méthode | Route | Description |
-|---------|-------|-------------|
-| POST | `/v1/auth/login` | Connexion |
-| POST | `/v1/auth/refresh` | Rafraîchir le token |
-| GET | `/v1/workers` | Liste des travailleurs |
-| POST | `/v1/workers` | Créer un travailleur |
-| GET | `/v1/attendance` | Liste des pointages |
-| POST | `/v1/attendance/check-in` | Pointage (tablette) |
-| GET | `/v1/penalties` | Liste des pénalités |
-| PATCH | `/v1/penalties/:id/approve` | Approuver une pénalité |
-| GET | `/v1/dashboard/stats` | Stats du dashboard |
-| POST | `/v1/sync/attendance` | Sync offline |
-
----
-
-## 🛠️ Commandes Utiles
-
-```bash
-# Développement
-npm run dev:api          # API en dev (hot-reload)
-npm run dev:dashboard    # Frontend en dev
-
-# Build
-npm run build:api        # Build l'API (→ dist/)
-npm run build:dashboard  # Build le Frontend (→ .next/)
-
-# Base de données
-npm run db:generate      # Générer le client Prisma
-npm run db:migrate       # Appliquer les migrations
-npm run db:seed          # Peupler la base
-npm run db:studio        # Ouvrir Prisma Studio
-
-# Déploiement
-./deploy.sh api          # Préparer l'API pour Render
-./deploy.sh dashboard    # Préparer le Frontend pour Render
-./deploy.sh all          # Préparer les deux
-
-# Qualité
-npm test                 # Lancer les tests
 ```
+shop-attendance/
+├── apps/
+│   ├── api/                    # Backend NestJS
+│   │   ├── src/modules/        # Modules métier
+│   │   │   ├── auth/           # Authentification
+│   │   │   ├── workers/        # Travailleurs
+│   │   │   ├── attendance/     # Pointage
+│   │   │   ├── devices/        # Tablettes
+│   │   │   ├── dashboard/      # Stats
+│   │   │   ├── penalties/      # Pénalités
+│   │   │   └── ...
+│   │   ├── prisma/             # Schema + migrations
+│   │   └── package.json
+│   │
+│   ├── admin-dashboard/        # Frontend Next.js
+│   │   ├── app/                # Pages (routing)
+│   │   ├── components/         # Composants UI
+│   │   ├── lib/                # Utils, API client, auth
+│   │   └── package.json
+│   │
+│   └── tablet-app/             # App Expo (React Native)
+│       ├── app/                # Écrans
+│       ├── components/         # Composants
+│       ├── services/           # API client, sync, biometrics
+│       ├── storage/            # Cache local (AsyncStorage)
+│       └── package.json
+│
+├── packages/
+│   └── types/                  # Types partagés (TypeScript)
+│
+├── render.yaml                 # Config Render (déploiement)
+├── package.json                # Racine monorepo
+└── DEPLOYMENT.md               # Guide de déploiement
+```
+
+---
+
+## 🔐 Sécurité
+
+- **JWT** : tokens d'accès (15min) + refresh tokens (7 jours)
+- **Roles** : seuls les admins accèdent au dashboard
+- **Endpoints publics** : login, check-in tablette, heartbeat
+- **Photo faciale** : stockée en base, comparée à chaque pointage
+- **PIN** : hashé avec bcrypt, jamais en clair
 
 ---
 
 ## 📄 Documentation
 
-- **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Guide complet de déploiement (GitHub + Render)
-- **Swagger** — Documentation API interactive
-
----
-
-## 🤝 Contribuer
-
-1. Créer une branche (`git checkout -b feature/ma-feature`)
-2. Committer (`git commit -m 'Ajouter ma feature'`)
-3. Push (`git push origin feature/ma-feature`)
-4. Ouvrir une Pull Request
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** — Guide de déploiement complet
+- **Swagger** : `https://shop-attendance-api.onrender.com/docs`
 
 ---
 
 ## 📝 Licence
 
 Projet privé — Tous droits réservés.
-
----
-
-
