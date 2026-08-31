@@ -17,18 +17,24 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.staffgo.app",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Autoriser StaffGo à utiliser Face ID pour confirmer votre identité."
+        "NSFaceIDUsageDescription": "Autoriser StaffGo à utiliser Face ID pour confirmer votre identité.",
+        "NSCameraUsageDescription": "Autoriser StaffGo à accéder à la caméra pour vérifier votre identité."
       }
     },
     "android": {
       "package": "com.staffgo.app",
-      "permissions": ["USE_BIOMETRIC", "USE_FINGERPRINT"],
+      "permissions": [
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "CAMERA"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#0F2A43"
       }
     },
     "plugins": [
       "expo-router",
+      "expo-image-picker",
       [
         "expo-local-authentication",
         {

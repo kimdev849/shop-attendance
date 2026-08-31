@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { WorkerStatus } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 import { AuditService } from "../audit/audit.service";
@@ -10,6 +10,8 @@ import { WorkerLookupResult, PinVerificationResult, WorkerRosterItem } from "./t
 
 @Injectable()
 export class WorkersService {
+  private readonly logger = new Logger(WorkersService.name);
+
   constructor(
     private readonly repository: WorkersRepository,
     private readonly auditService: AuditService,
