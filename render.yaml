@@ -11,7 +11,7 @@ services:
     runtime: node
     region: frankfurt
     buildCommand: npm install && npm run build:api
-    startCommand: npm run start:prod --workspace=apps/api
+    startCommand: npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma && npm run start:prod --workspace=apps/api
     envVars:
       - key: NODE_ENV
         value: production

@@ -58,11 +58,17 @@ export default function ConfirmationScreen() {
   if (!result) return null;
 
   const isLate = result.status === "LATE";
+  const isCheckOut = result.type === "CHECK_OUT";
   const checkInTime = new Date(result.checkInTime);
   const timeLabel = checkInTime.toLocaleTimeString("fr-FR", {
     hour: "2-digit",
     minute: "2-digit",
   });
+  const checkOutTime = result.checkOutTime ? new Date(result.checkOutTime) : null;
+  const checkOutLabel = checkOutTime?.toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }) ?? null;
 
   return (
     <ScreenContainer>
@@ -88,7 +94,7 @@ export default function ConfirmationScreen() {
         )}
       </Animated.View>
 
-      <Text style={styles.title}>Pointage enregistre</Text>
+      <Text style={styles.title}>{isCheckOut ? "Sortie enregistree" : "Pointage enregistre"}</Text>
 
       <Text style={styles.workerName}>{result.workerFullName}</Text>
 
@@ -99,8 +105,8 @@ export default function ConfirmationScreen() {
           { opacity: cardOpacity, transform: [{ translateY: cardTranslateY }] },
         ]}
       >
-        <Text style={styles.infoLabel}>HEURE D'ARRIVEE</Text>
-        <Text style={styles.infoTime}>{timeLabel}</Text>
+        <Text style={styles.infoLabel}>{isCheckOut ? "HEURE DE SORTIE" : "HEURE D'ARRIVEE"}</Text>
+        <Text style={styles.infoTime}>{isCheckOut && checkOutLabel ? checkOutLabel : timeLabel}</Text>
 
         <View style={styles.divider} />
 
@@ -155,9 +161,7 @@ export default function ConfirmationScreen() {
         </View>
       )}
 
-      <View style={{ flex: 1 }} />
-
-      <Text style={styles.bye}>Bonne journee</Text>
+      <View style={{ flex: 1 }} />        <Text style={styles.bye}>{isCheckOut ? "Bonne soiree" : "Bonne journee"}</Text>
 
       <View style={{ height: 14 }} />
       <PrimaryButton

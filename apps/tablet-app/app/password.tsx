@@ -71,17 +71,17 @@ export default function PasswordScreen() {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+      keyboardVerticalOffset={0}
     >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={[styles.container, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 16 }]}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
           {/* Back */}
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
             <ArrowLeft size={20} color={theme.colors.textSecondary} weight="bold" />
             <Text style={styles.backText}>Retour</Text>
           </Pressable>
 
-          {/* Top section — avatar + title */}
+          {/* Top — avatar + name */}
           <View style={styles.topSection}>
             <View style={styles.avatar}>
               <Text style={styles.initials}>
@@ -90,42 +90,43 @@ export default function PasswordScreen() {
             </View>
             <Text style={styles.workerName}>{worker.firstName} {worker.lastName}</Text>
             <Text style={styles.workerNumber}>{worker.employeeNumber}</Text>
+          </View>
 
-            <View style={styles.divider} />
-
+          {/* Center — PIN input */}
+          <View style={styles.centerSection}>
             <View style={styles.iconWrap}>
               <Fingerprint size={28} color={theme.colors.primary} weight="fill" />
             </View>
             <Text style={styles.title}>Code PIN</Text>
             <Text style={styles.subtitle}>Saisissez votre code à 4 chiffres</Text>
-          </View>
 
-          {/* Middle — input */}
-          <View style={styles.middleSection}>
+            <View style={{ height: 28 }} />
+
             <TextInput
               value={pin}
               onChangeText={(t) => { setPin(t.replace(/[^0-9]/g, "").slice(0, 6)); setError(null); }}
               placeholder="••••"
-              placeholderTextColor={theme.colors.textMuted}
+              placeholderTextColor="#64748B"
               autoFocus
               keyboardType="number-pad"
               maxLength={6}
               style={styles.input}
               onSubmitEditing={handleVerify}
+              returnKeyType="done"
             />
 
-            {error && (
+            {error ? (
               <View style={styles.errorBox}>
                 <WarningCircle size={16} color="#ef4444" weight="fill" />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
+            ) : (
+              <Text style={styles.hint}>Demandez votre code à votre responsable</Text>
             )}
-
-            <Text style={styles.hint}>Demandez votre code à votre responsable</Text>
           </View>
 
-          {/* Bottom — button always visible above keyboard */}
-          <View style={styles.bottomSection}>
+          {/* Bottom — button + safe area */}
+          <View style={[styles.bottomSection, { paddingBottom: insets.bottom + 16 }]}>
             {loading ? (
               <View style={styles.loadingWrap}>
                 <ActivityIndicator color={theme.colors.primary} size="large" />
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
   },
   topSection: {
     alignItems: "center",
-    paddingTop: 8,
+    paddingTop: 4,
   },
   avatar: {
     width: 72,
@@ -194,12 +195,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 4,
   },
-  divider: {
-    width: 40,
-    height: 2,
-    backgroundColor: theme.colors.border,
-    borderRadius: 1,
-    marginVertical: 20,
+  centerSection: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
   },
   iconWrap: {
     width: 56,
@@ -211,35 +211,29 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    color: theme.colors.text,
+    color: "#FFFFFF",
     fontSize: 22,
     fontWeight: "800",
   },
   subtitle: {
-    color: theme.colors.textSecondary,
+    color: "#94A3B8",
     fontSize: 15,
     marginTop: 6,
-  },
-  middleSection: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
   },
   input: {
     width: "100%",
     maxWidth: 280,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: "#0F172A",
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: theme.colors.primary + "60",
+    borderColor: "#3B82F6",
     paddingVertical: 18,
     paddingHorizontal: 20,
-    fontSize: 32,
+    fontSize: 36,
     color: "#FFFFFF",
     textAlign: "center",
     letterSpacing: 16,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   errorBox: {
     flexDirection: "row",
@@ -261,7 +255,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   hint: {
-    color: theme.colors.textMuted,
+    color: "#64748B",
     fontSize: 13,
     marginTop: 16,
     textAlign: "center",

@@ -257,10 +257,22 @@ export class WorkersService {
 
   async getFacePhotoByEmployeeNumber(employeeNumber: string, shopId: string) {
     const worker = await this.repository.findByEmployeeNumber(employeeNumber);
-    if (!worker || worker.status !== "ACTIVE" || worker.shopId !== shopId || !worker.facePhoto) {
+    if (!worker || worker.status !== "ACTIVE" || worker.shopId !== shopId) {
       return null;
     }
-    return { facePhoto: worker.facePhoto, faceDescriptor: worker.faceDescriptor };
+
+    // Determine next action: check-in or check-out
+    let nextAction: "CHECK_IN" | "CHECK_OUT" = "CHECK_IN";
+    try {
+      const existingAttendance = await this.repository.findTodayAttendance(worker.id);
+      if (existingAttendance && !existingAttendance.checkOutTime) {
+        nextAction = "CHECK_OUT";
+      }
+    } catch {
+      // Fallback: default to CHECK_IN
+    }
+
+    return { facePhoto: worker.facePhoto ?? null, faceDescriptor: worker.faceDescriptor ?? null, nextAction };
   }
 
   async verifyFace(employeeNumber: string, shopId: string, capturedPhoto: string): Promise<{ matched: boolean; distance?: number }> {

@@ -96,4 +96,12 @@ export class WorkersRepository {
       update: { ...dto },
     });
   }
+
+  async findTodayAttendance(workerId: string) {
+    const now = new Date();
+    const attendanceDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    return this.prisma.attendance.findUnique({
+      where: { workerId_attendanceDate: { workerId, attendanceDate } },
+    });
+  }
 }

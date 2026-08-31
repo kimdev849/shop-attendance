@@ -36,6 +36,7 @@ export default function BiometryScreen() {
   const [step, setStep] = useState<Step>("loading");
   const [message, setMessage] = useState<string | null>(null);
   const [hasRefPhoto, setHasRefPhoto] = useState(false);
+  const [attendanceType, setAttendanceType] = useState<"CHECK_IN" | "CHECK_OUT" | null>(null);
 
   useEffect(() => {
     if (!worker) { router.replace("/identification"); return; }
@@ -48,9 +49,12 @@ export default function BiometryScreen() {
       if (!config) { setStep("error"); setMessage("Tablette non configurée."); return; }
       const data = await getFacePhotoForCheckIn(worker!.employeeNumber, config.shopId);
       setHasRefPhoto(!!data?.facePhoto);
+      // Server returns whether check-in or check-out already exists
+      setAttendanceType(data?.nextAction ?? "CHECK_IN");
       setStep("ready");
     } catch {
       setHasRefPhoto(false);
+      setAttendanceType("CHECK_IN");
       setStep("ready");
     }
   }
@@ -121,6 +125,7 @@ export default function BiometryScreen() {
         clientTimestamp: new Date().toISOString(),
         clientRequestId: generateId(),
         biometricConfirmed: true,
+        type: attendanceType ?? "CHECK_IN",
       };
 
       const online = await isOnline();
@@ -195,13 +200,15 @@ export default function BiometryScreen() {
             {worker?.firstName} {worker?.lastName}
           </Text>
           <Text style={styles.hint}>
-            {hasRefPhoto
-              ? "Votre visage sera comparé à la photo enregistrée"
-              : "Passez la caméra pour confirmer votre présence"}
+            {attendanceType === "CHECK_OUT"
+              ? "Vous avez déjà pointé aujourd'hui — pointage de sortie"
+              : hasRefPhoto
+                ? "Votre visage sera comparé à la photo enregistrée"
+                : "Passez la caméra pour confirmer votre présence"}
           </Text>
           <View style={{ height: 32 }} />
           <PrimaryButton
-            label="S'authentifier"
+            label={attendanceType === "CHECK_OUT" ? "Pointer la sortie" : "S'authentifier"}
             onPress={handleAuthenticate}
             icon={<ScanFace size={18} color="#fff" weight="bold" />}
             fullWidth
@@ -231,7 +238,9 @@ export default function BiometryScreen() {
           <View style={styles.iconGreen}>
             <CheckCircle size={48} color={theme.colors.success} weight="fill" />
           </View>
-          <Text style={styles.successText}>Pointage enregistré</Text>
+          <Text style={styles.successText}>
+            {attendanceType === "CHECK_OUT" ? "Sortie enregistrée" : "Pointage enregistré"}
+          </Text>
         </View>
       )}
 

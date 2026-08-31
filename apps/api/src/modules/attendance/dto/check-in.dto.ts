@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsBoolean, IsISO8601, IsString, IsUUID } from "class-validator";
+import { IsBoolean, IsISO8601, IsOptional, IsString, IsUUID } from "class-validator";
 
 export class CheckInDto {
   @ApiProperty({ description: "ID du travailleur qui pointe" })
@@ -33,4 +33,13 @@ export class CheckInDto {
   })
   @IsBoolean()
   biometricConfirmed: boolean;
+
+  @ApiProperty({
+    description: "Type de pointage: CHECK_IN ou CHECK_OUT. Si omis, détection automatique.",
+    enum: ["CHECK_IN", "CHECK_OUT"],
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  type?: "CHECK_IN" | "CHECK_OUT";
 }

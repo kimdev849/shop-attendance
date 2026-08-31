@@ -212,6 +212,7 @@ model Attendance {
   attendanceDate    DateTime         @db.Date
   scheduledTime     DateTime?
   checkInTime       DateTime
+  checkOutTime      DateTime?
   latenessMinutes   Int              @default(0)
   status            AttendanceStatus @default(ON_TIME)
   syncStatus        SyncStatus       @default(SYNCED)

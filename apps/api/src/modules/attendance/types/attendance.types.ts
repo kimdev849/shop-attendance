@@ -9,11 +9,13 @@ export interface CheckInResult {
   attendanceId: string;
   workerFullName: string;
   checkInTime: Date;
+  checkOutTime: Date | null;
   scheduledTime: Date | null;
   latenessMinutes: number;
   status: AttendanceStatus;
   penaltyAmount: number | null;
   penaltyStatus: PenaltyStatus | null;
+  type: 'CHECK_IN' | 'CHECK_OUT';
 }
 
 export interface LatenessResult {

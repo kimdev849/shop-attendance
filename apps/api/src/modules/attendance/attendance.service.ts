@@ -50,7 +50,7 @@ export class AttendanceService {
     // résultat existant au lieu de créer un doublon.
     const existingByRequestId = await this.repository.findByClientRequestId(dto.clientRequestId);
     if (existingByRequestId) {
-      return this.toResult(existingByRequestId, existingByRequestId.penalty);
+      return this.toResult(existingByRequestId, existingByRequestId.penalty, existingByRequestId.checkOutTime ? 'CHECK_OUT' : 'CHECK_IN');
     }
 
     // 1. Vérifier le travailleur
@@ -83,19 +83,53 @@ export class AttendanceService {
       );
     }
 
-    const checkInTime = new Date(dto.clientTimestamp);
-    const attendanceDate = this.dateOnly(checkInTime);
+    const clientTime = new Date(dto.clientTimestamp);
+    const attendanceDate = this.dateOnly(clientTime);
 
-    // Protection anti-doublon supplémentaire: un seul pointage par travailleur
-    // et par jour calendaire (contrainte unique en base, vérifiée ici aussi
-    // pour renvoyer un message clair plutôt qu'une erreur SQL brute).
+    // Vérifier si un pointage existe déjà aujourd'hui
     const existingForDay = await this.repository.findByWorkerAndDate(worker.id, attendanceDate);
+
+    // Déterminer le type de pointage
+    const type = dto.type ?? (existingForDay ? "CHECK_OUT" : "CHECK_IN");
+
+    // === CHECK-OUT ===
+    if (type === "CHECK_OUT") {
+      if (!existingForDay) {
+        throw new BadRequestException(
+          "Aucun check-in trouvé pour aujourd'hui. Impossible de pointer la sortie.",
+        );
+      }
+      if (existingForDay.checkOutTime) {
+        // Déjà pointé sortie — retourner l'existant
+        return this.toResult(existingForDay, existingForDay.penalty, 'CHECK_OUT');
+      }
+
+      // Mettre à jour avec l'heure de sortie
+      const updated = await this.repository.updateCheckOut(existingForDay.id, clientTime);
+
+      await this.auditService.log({
+        action: "ATTENDANCE_CHECK_OUT",
+        entity: "Attendance",
+        entityId: updated.id,
+        metadata: {
+          employeeNumber: worker.employeeNumber,
+          firstName: worker.firstName,
+          lastName: worker.lastName,
+          shopName: shop.name,
+        },
+      });
+
+      return this.toResult(updated, updated.penalty, 'CHECK_OUT');
+    }
+
+    // === CHECK-IN ===
     if (existingForDay) {
-      return this.toResult(existingForDay, existingForDay.penalty);
+      // Déjà pointé aujourd'hui — retourner l'existant (idempotent)
+      return this.toResult(existingForDay, existingForDay.penalty, 'CHECK_IN');
     }
 
     // 4. Récupérer l'horaire applicable
-    const schedule = await this.schedulesService.findApplicableSchedule(worker.id, checkInTime);
+    const schedule = await this.schedulesService.findApplicableSchedule(worker.id, clientTime);
 
     // 5. Déterminer l'heure prévue + 6. calculer le retard + 7. déterminer le statut
     let scheduledDateTime: Date | null = null;
@@ -106,7 +140,7 @@ export class AttendanceService {
       scheduledDateTime = this.combineDateAndTime(attendanceDate, schedule.startTime);
       const lateness: LatenessResult = this.penaltyCalculator.computeLateness(
         scheduledDateTime,
-        checkInTime,
+        clientTime,
         schedule.toleranceMinutes,
       );
       latenessMinutes = lateness.retainedLatenessMinutes;
@@ -134,7 +168,7 @@ export class AttendanceService {
         deviceId: device.id,
         attendanceDate,
         scheduledTime: scheduledDateTime,
-        checkInTime,
+        checkInTime: clientTime,
         latenessMinutes,
         status,
         syncStatus: "SYNCED",
@@ -146,7 +180,7 @@ export class AttendanceService {
       // plutôt que d'échouer, pour garantir l'idempotence bout-en-bout.
       if (error?.code === "P2002") {
         const race = await this.repository.findByWorkerAndDate(worker.id, attendanceDate);
-        if (race) return this.toResult(race, race.penalty);
+        if (race) return this.toResult(race, race.penalty, 'CHECK_IN');
       }
       throw error;
     }
@@ -180,7 +214,7 @@ export class AttendanceService {
     });
 
     // 10. Retourner le résultat
-    return this.toResult(attendance, penalty);
+    return this.toResult(attendance, penalty, 'CHECK_IN');
   }
 
   async findAll(query: QueryAttendanceDto) {
@@ -242,16 +276,18 @@ export class AttendanceService {
     return combined;
   }
 
-  private toResult(attendance: any, penalty: any): CheckInResult {
+  private toResult(attendance: any, penalty: any, type: 'CHECK_IN' | 'CHECK_OUT' = 'CHECK_IN'): CheckInResult {
     return {
       attendanceId: attendance.id,
       workerFullName: `${attendance.worker.firstName} ${attendance.worker.lastName}`,
       checkInTime: attendance.checkInTime,
+      checkOutTime: attendance.checkOutTime ?? null,
       scheduledTime: attendance.scheduledTime,
       latenessMinutes: attendance.latenessMinutes,
       status: attendance.status,
       penaltyAmount: penalty?.amount ?? null,
       penaltyStatus: penalty?.status ?? null,
+      type,
     };
   }
 }
