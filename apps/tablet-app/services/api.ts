@@ -27,6 +27,13 @@ async function fetchWithTimeout(url: string, options: RequestInit): Promise<Resp
   throw lastError;
 }
 
+/** Safely parse JSON from a response, handling empty bodies. */
+async function safeJson(response: Response): Promise<any> {
+  const text = await response.text();
+  if (!text || !text.trim()) return {};
+  return JSON.parse(text);
+}
+
 // ── Check-in / Attendance ──────────────────────────────────────────
 
 export async function submitCheckIn(payload: CheckInPayload): Promise<CheckInResult> {
@@ -41,7 +48,7 @@ export async function submitCheckIn(payload: CheckInPayload): Promise<CheckInRes
     throw new Error(body.message ?? `Erreur serveur (${response.status})`);
   }
 
-  return response.json();
+  return safeJson(response);
 }
 
 export async function syncAttendanceBatch(
@@ -58,7 +65,7 @@ export async function syncAttendanceBatch(
     throw new Error(body.message ?? `Erreur serveur (${response.status})`);
   }
 
-  return response.json();
+  return safeJson(response);
 }
 
 // ── Workers ────────────────────────────────────────────────────────
@@ -69,7 +76,7 @@ export async function fetchWorkerRoster(shopId: string) {
     { method: "GET" },
   );
   if (!response.ok) throw new Error("Impossible de récupérer la liste des travailleurs.");
-  return response.json();
+  return safeJson(response);
 }
 
 export async function lookupWorkerByEmployeeNumber(employeeNumber: string, shopId: string) {
@@ -81,7 +88,7 @@ export async function lookupWorkerByEmployeeNumber(employeeNumber: string, shopI
     if (response.status === 404) return null;
     throw new Error("Impossible de vérifier le matricule.");
   }
-  return response.json();
+  return safeJson(response);
 }
 
 /**
@@ -94,7 +101,7 @@ export async function searchWorkersByName(shopId: string, search: string) {
     method: "GET",
   });
   if (!response.ok) throw new Error("Impossible de rechercher les travailleurs.");
-  return response.json() as Promise<Array<{ id: string; employeeNumber: string; firstName: string; lastName: string }>>;
+  return safeJson(response) as Promise<Array<{ id: string; employeeNumber: string; firstName: string; lastName: string }>>;
 }
 
 export async function verifyWorkerPin(employeeNumber: string, shopId: string, pin: string) {
@@ -104,10 +111,10 @@ export async function verifyWorkerPin(employeeNumber: string, shopId: string, pi
     body: JSON.stringify({ employeeNumber, shopId, pin }),
   });
   if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
+    const body = await safeJson(response);
     throw new Error(body.message ?? "Mot de passe incorrect.");
   }
-  return response.json();
+  return safeJson(response);
 }
 
 export async function getFacePhotoForCheckIn(employeeNumber: string, shopId: string) {
@@ -117,7 +124,7 @@ export async function getFacePhotoForCheckIn(employeeNumber: string, shopId: str
     body: JSON.stringify({ employeeNumber, shopId }),
   });
   if (!response.ok) return null;
-  return response.json();
+  return safeJson(response);
 }
 
 // ── Heartbeat ───────────────────────────────────────────────────────
@@ -164,7 +171,7 @@ export async function fetchShops(search?: string, page = 1, limit = 50) {
   });
 
   if (!response.ok) throw new Error("Impossible de récupérer la liste des shops.");
-  return response.json() as Promise<{
+  return safeJson(response) as Promise<{
     data: ShopSummary[];
     total: number;
     page: number;
@@ -188,7 +195,7 @@ export async function findExistingDevice(name: string, shopId: string) {
     throw new Error(body.message ?? "Tablette introuvable. Créez-la d'abord depuis le dashboard admin.");
   }
 
-  return response.json() as Promise<{
+  return safeJson(response) as Promise<{
     id: string;
     deviceIdentifier: string;
     name: string;
