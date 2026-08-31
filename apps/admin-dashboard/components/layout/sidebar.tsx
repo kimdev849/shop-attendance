@@ -14,10 +14,10 @@ import {
   FileBarChart,
   Tablet,
   Settings,
-  ShieldCheck,
   ClipboardList,
   LogOut,
 } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 
@@ -67,11 +67,11 @@ function DesktopSidebar() {
     <aside className="hidden lg:flex lg:w-60 lg:shrink-0 lg:flex-col lg:border-r lg:border-border/50 lg:bg-card/80 lg:backdrop-blur-sm">
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 border-b border-border/40 px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-          <ShieldCheck className="h-5 w-5" />
+        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-sm">
+          <Image src="/images/icon.png" alt="StaffGo" width={36} height={36} className="object-cover" />
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-bold tracking-tight text-foreground truncate">ShopAttendance</p>
+          <p className="text-sm font-bold tracking-tight text-foreground truncate">StaffGo</p>
           <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">Administration</p>
         </div>
       </div>
@@ -165,14 +165,13 @@ function MobileSlideOver() {
 
   return (
     <div className="fixed inset-0 z-50 flex lg:hidden">
-      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
-      <div className="relative z-10 flex w-72 flex-col bg-card shadow-2xl animate-slide-in">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />        <div className="relative z-10 flex w-72 flex-col bg-card shadow-2xl animate-slide-in">
         <div className="flex h-16 items-center justify-between border-b border-border/40 px-5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <ShieldCheck className="h-5 w-5" />
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-sm">
+              <Image src="/images/icon.png" alt="StaffGo" width={36} height={36} className="object-cover" />
             </div>
-            <span className="text-sm font-bold">ShopAttendance</span>
+            <span className="text-sm font-bold">StaffGo</span>
           </div>
           <button onClick={() => setMobileOpen(false)} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground">✕</button>
         </div>
