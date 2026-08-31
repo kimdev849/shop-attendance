@@ -107,7 +107,6 @@ export default function PasswordScreen() {
               onChangeText={(t) => { setPin(t.replace(/[^0-9]/g, "").slice(0, 6)); setError(null); }}
               placeholder="••••"
               placeholderTextColor={theme.colors.textMuted}
-              secureTextEntry
               autoFocus
               keyboardType="number-pad"
               maxLength={6}
