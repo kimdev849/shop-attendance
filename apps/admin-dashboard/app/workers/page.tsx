@@ -71,6 +71,7 @@ export default function WorkersPage() {
   const [pinValue, setPinValue] = useState("");
   const [faceTarget, setFaceTarget] = useState<Worker | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<"user" | "environment">("user");
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [faceStatus, setFaceStatus] = useState<"idle" | "detecting" | "detected" | "no-face" | "error">("idle");
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -154,12 +155,18 @@ export default function WorkersPage() {
     finally { setSaving(false); }
   }
 
-  async function openCamera() {
+  async function openCamera(facing?: "user" | "environment") {
+    const mode = facing ?? cameraFacing;
+    if (facing) setCameraFacing(facing);
     setCameraActive(true);
     setCapturedPhoto(null);
     setFaceStatus("idle");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 480, height: 480 } });
+      // Stop existing stream first
+      if (videoRef.current?.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: mode, width: 480, height: 480 } });
       if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play(); }
     } catch { toast("Impossible d'accéder à la caméra.", "error"); setCameraActive(false); }
   }
@@ -379,8 +386,18 @@ export default function WorkersPage() {
           {/* Camera live */}
           {cameraActive && (
             <div className="text-center">
-              <video ref={videoRef} className="mx-auto h-56 w-56 rounded-xl object-cover border-2 border-primary" autoPlay muted playsInline />
-              <canvas ref={canvasRef} className="hidden" />
+              <div className="relative mx-auto inline-block">
+                <video ref={videoRef} className="mx-auto h-56 w-56 rounded-xl object-cover border-2 border-primary" autoPlay muted playsInline />
+                <canvas ref={canvasRef} className="hidden" />
+                {/* Flip camera button */}
+                <button
+                  onClick={() => openCamera(cameraFacing === "user" ? "environment" : "user")}
+                  className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background shadow-sm transition-colors hover:bg-secondary"
+                  title="Changer de caméra"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 19H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/><path d="M13 5h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-5"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
               <p className="mt-2 text-xs text-primary font-medium">Regardez la caméra…</p>
               <div className="mt-3 flex justify-center gap-2">
                 <Button onClick={capturePhoto}><Camera className="h-4 w-4" /> Capturer</Button>
@@ -426,7 +443,7 @@ export default function WorkersPage() {
           <div className="flex justify-between pt-2">
             <div className="flex gap-2">
               {!cameraActive && (
-                <Button variant="outline" size="sm" onClick={openCamera}>
+                <Button variant="outline" size="sm" onClick={() => openCamera()}>
                   <Camera className="h-3.5 w-3.5" /> {capturedPhoto ? "Reprendre" : "Ouvrir caméra"}
                 </Button>
               )}
@@ -438,8 +455,9 @@ export default function WorkersPage() {
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => { setFaceTarget(null); stopCamera(); }}>Fermer</Button>
-              {capturedPhoto && (
-                <Button onClick={handleSaveFacePhoto} disabled={saving || faceStatus !== "detected"}>
+              {/* Enregistrer UNIQUEMENT si visage détecté */}
+              {faceStatus === "detected" && (
+                <Button onClick={handleSaveFacePhoto} disabled={saving}>
                   {saving ? "Enregistrement..." : "Enregistrer"}
                 </Button>
               )}
