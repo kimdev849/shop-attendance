@@ -14,10 +14,9 @@ import {
   WarningCircle,
   ArrowLeft,
   MagnifyingGlass,
-  CheckCircle,
+  UserCircle,
 } from "phosphor-react-native";
 import { ScreenContainer } from "../components/screen-container";
-import { PrimaryButton } from "../components/primary-button";
 import { theme } from "../components/theme";
 import { getDeviceConfig } from "../storage/device-config";
 import {
@@ -37,20 +36,19 @@ export default function IdentificationScreen() {
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Load full roster on mount for offline search
-  useEffect(() => {
-    (async () => {
-      const cached = await searchCachedRoster("");
-      setResults(cached);
-    })();
-  }, []);
 
   const doSearch = useCallback(
     async (q: string) => {
+      if (!q.trim()) {
+        setResults([]);
+        setHasSearched(false);
+        return;
+      }
       setSearching(true);
       setError(null);
+      setHasSearched(true);
       try {
         const config = await getDeviceConfig();
         if (!config) {
@@ -66,7 +64,6 @@ export default function IdentificationScreen() {
           setResults(filtered);
         }
       } catch {
-        // Fallback to cache
         const filtered = await searchCachedRoster(q);
         setResults(filtered);
       } finally {
@@ -89,10 +86,9 @@ export default function IdentificationScreen() {
     try {
       const config = await getDeviceConfig();
       if (!config) {
-        setError("Tablette non configurée. Contactez votre administrateur.");
+        setError("Tablette non configurée.");
         return;
       }
-
       const online = await isOnline();
       if (online) {
         const fullWorker = await lookupWorkerByEmployeeNumber(
@@ -105,8 +101,6 @@ export default function IdentificationScreen() {
           return;
         }
       }
-
-      // Offline fallback: use cached worker data
       setWorker({
         id: worker.id,
         firstName: worker.firstName,
@@ -128,7 +122,7 @@ export default function IdentificationScreen() {
           w.lastName.toLowerCase().includes(query.toLowerCase()) ||
           w.employeeNumber.toLowerCase().includes(query.toLowerCase()),
       )
-    : results;
+    : [];
 
   return (
     <ScreenContainer>
@@ -137,61 +131,69 @@ export default function IdentificationScreen() {
         <Text style={styles.backText}>Retour</Text>
       </Pressable>
 
-      <View style={styles.iconCircle}>
-        <User size={30} color={theme.colors.primaryLight} weight="bold" />
-      </View>
-
-      <Text style={styles.title}>Qui êtes-vous ?</Text>
-      <Text style={styles.subtitle}>
-        Recherchez votre nom pour commencer
-      </Text>
-
-      <View style={{ height: 20 }} />
-
-      {/* Search input */}
-      <View style={styles.searchCard}>
-        <MagnifyingGlass size={18} color={theme.colors.textMuted} weight="bold" />
-        <TextInput
-          value={query}
-          onChangeText={handleSearchChange}
-          placeholder="Rechercher par nom..."
-          placeholderTextColor={theme.colors.textMuted}
-          autoCapitalize="words"
-          autoCorrect={false}
-          autoFocus
-          style={styles.searchInput}
-        />
-        {searching ? (
-          <ActivityIndicator size="small" color={theme.colors.primary} />
-        ) : null}
-      </View>
-
-      {error && (
-        <View style={styles.errorBox}>
-          <WarningCircle size={16} color={theme.colors.danger} weight="fill" />
-          <Text style={styles.error}>{error}</Text>
+      <View style={styles.topSection}>
+        {/* Icon */}
+        <View style={styles.iconCircle}>
+          <UserCircle size={36} color={theme.colors.primary} weight="fill" />
         </View>
-      )}
 
-      {/* Results list */}
-      <View style={styles.resultsContainer}>
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color={theme.colors.primary} size="large" />
-            <Text style={styles.loadingText}>Recherche en cours...</Text>
+        {/* Text */}
+        <Text style={styles.title}>Pointage</Text>
+        <Text style={styles.subtitle}>
+          Tapez votre nom pour vous identifier
+        </Text>
+
+        {/* Search bar */}
+        <View style={styles.searchCard}>
+          <MagnifyingGlass size={18} color={theme.colors.textMuted} weight="bold" />
+          <TextInput
+            value={query}
+            onChangeText={handleSearchChange}
+            placeholder="Votre nom..."
+            placeholderTextColor={theme.colors.textMuted}
+            autoCapitalize="words"
+            autoCorrect={false}
+            autoFocus
+            style={styles.searchInput}
+          />
+          {searching ? (
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+          ) : query.length > 0 ? (
+            <Pressable onPress={() => { setQuery(""); setResults([]); setHasSearched(false); }}>
+              <Text style={styles.clearText}>✕</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        {error && (
+          <View style={styles.errorBox}>
+            <WarningCircle size={16} color={theme.colors.danger} weight="fill" />
+            <Text style={styles.error}>{error}</Text>
           </View>
-        ) : displayResults.length === 0 ? (
-          <View style={styles.emptyWrap}>
+        )}
+      </View>
+
+      {/* Results — only shown when searching */}
+      <View style={styles.bottomSection}>
+        {loading ? (
+          <View style={styles.centerWrap}>
+            <ActivityIndicator color={theme.colors.primary} size="large" />
+            <Text style={styles.hintText}>Recherche...</Text>
+          </View>
+        ) : hasSearched && displayResults.length === 0 ? (
+          <View style={styles.centerWrap}>
             <Text style={styles.emptyText}>
-              {query.trim()
-                ? "Aucun travailleur trouvé pour cette recherche."
-                : "Aucun travailleur dans ce shop."}
+              Aucun résultat pour « {query} »
+            </Text>
+            <Text style={styles.emptyHint}>
+              Vérifiez l'orthographe ou demandez à l'administrateur
             </Text>
           </View>
-        ) : (
+        ) : displayResults.length > 0 ? (
           <ScrollView
             style={styles.resultsScroll}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
             {displayResults.map((worker) => (
               <Pressable
@@ -201,11 +203,10 @@ export default function IdentificationScreen() {
               >
                 <View style={styles.workerAvatar}>
                   <Text style={styles.workerInitials}>
-                    {worker.firstName.charAt(0)}
-                    {worker.lastName.charAt(0)}
+                    {worker.firstName.charAt(0)}{worker.lastName.charAt(0)}
                   </Text>
                 </View>
-                <View style={{ flex: 1 }}>
+                <View style={styles.workerInfo}>
                   <Text style={styles.workerName}>
                     {worker.firstName} {worker.lastName}
                   </Text>
@@ -213,11 +214,11 @@ export default function IdentificationScreen() {
                     {worker.employeeNumber}
                   </Text>
                 </View>
-                <CheckCircle size={18} color={theme.colors.textMuted} weight="bold" />
+                <Text style={styles.arrow}>›</Text>
               </Pressable>
             ))}
           </ScrollView>
-        )}
+        ) : null}
       </View>
     </ScreenContainer>
   );
@@ -238,87 +239,55 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     fontSize: 14,
   },
+  topSection: {
+    alignItems: "center",
+    paddingTop: 50,
+  },
   iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: theme.colors.surfaceAlt,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: theme.colors.border,
   },
   title: {
     color: theme.colors.text,
-    fontSize: 22,
-    fontWeight: "700",
-    textAlign: "center",
+    fontSize: 24,
+    fontWeight: "800",
   },
   subtitle: {
-    color: theme.colors.textMuted,
-    fontSize: 14,
-    textAlign: "center",
+    color: theme.colors.textSecondary,
+    fontSize: 15,
     marginTop: 6,
+    marginBottom: 24,
   },
   // Search
   searchCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: theme.colors.input,
-    borderRadius: theme.radius,
+    borderRadius: 16,
     borderWidth: 1.5,
     borderColor: theme.colors.border,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     gap: 10,
+    width: "100%",
+    maxWidth: 400,
   },
   searchInput: {
     flex: 1,
     paddingVertical: 16,
-    fontSize: 16,
+    fontSize: 17,
     color: theme.colors.text,
   },
-  // Results
-  resultsContainer: {
-    flex: 1,
-    marginTop: 16,
-  },
-  resultsScroll: {
-    flex: 1,
-  },
-  workerItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: theme.colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  workerAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.colors.surfaceAlt,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  workerInitials: {
-    color: theme.colors.primary,
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  workerName: {
-    color: theme.colors.text,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  workerMatricule: {
+  clearText: {
     color: theme.colors.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 18,
+    padding: 4,
   },
   // Error
   errorBox: {
@@ -332,6 +301,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: "rgba(239,68,68,0.15)",
+    width: "100%",
+    maxWidth: 400,
   },
   error: {
     color: theme.colors.danger,
@@ -339,22 +310,77 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     flex: 1,
   },
-  loadingWrap: {
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 40,
+  // Bottom section
+  bottomSection: {
+    flex: 1,
+    marginTop: 20,
+    width: "100%",
+    maxWidth: 400,
   },
-  loadingText: {
+  resultsScroll: {
+    flex: 1,
+  },
+  centerWrap: {
+    alignItems: "center",
+    paddingVertical: 40,
+    gap: 8,
+  },
+  hintText: {
     color: theme.colors.textMuted,
     fontSize: 13,
   },
-  emptyWrap: {
-    alignItems: "center",
-    paddingVertical: 40,
-  },
   emptyText: {
+    color: theme.colors.textSecondary,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  emptyHint: {
     color: theme.colors.textMuted,
-    fontSize: 14,
+    fontSize: 13,
     textAlign: "center",
+    marginTop: 4,
+  },
+  // Worker card
+  workerItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  workerAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.primary + "15",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  workerInitials: {
+    color: theme.colors.primary,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  workerInfo: {
+    flex: 1,
+  },
+  workerName: {
+    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  workerMatricule: {
+    color: theme.colors.textMuted,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  arrow: {
+    color: theme.colors.textMuted,
+    fontSize: 22,
+    fontWeight: "300",
   },
 });
