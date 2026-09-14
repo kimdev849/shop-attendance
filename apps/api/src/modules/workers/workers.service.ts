@@ -7,6 +7,7 @@ import { CreateWorkerDto } from "./dto/create-worker.dto";
 import { UpdateWorkerDto } from "./dto/update-worker.dto";
 import { AssignScheduleDto } from "./dto/assign-schedule.dto";
 import { WorkerLookupResult, PinVerificationResult, WorkerRosterItem } from "./types/workers.types";
+import { FaceRecognitionService } from "./face-recognition.service";
 
 @Injectable()
 export class WorkersService {
@@ -15,6 +16,7 @@ export class WorkersService {
   constructor(
     private readonly repository: WorkersRepository,
     private readonly auditService: AuditService,
+    private readonly faceRecognitionService: FaceRecognitionService,
   ) {}
 
   async create(dto: CreateWorkerDto, actorUserId?: string) {
@@ -282,74 +284,45 @@ export class WorkersService {
     if (!worker || worker.status !== "ACTIVE" || worker.shopId !== shopId) {
       return { matched: false };
     }
-    if (!worker.faceDescriptor) {
-      // No descriptor stored — can't compare, treat as match (fallback)
-      return { matched: true };
-    }
     try {
-      const sharp = (await import("sharp")).default;
-
-      // Decode captured photo from base64
-      const capturedBase64 = capturedPhoto.replace(/^data:image\/\w+;base64,/, "");
-      const capturedBuffer = Buffer.from(capturedBase64, "base64");
-
-      // Get stored photo from DB
-      const storedPhoto = worker.facePhoto;
-      if (!storedPhoto) return { matched: true };
-
-      const storedBase64 = storedPhoto.replace(/^data:image\/\w+;base64,/, "");
-      const storedBuffer = Buffer.from(storedBase64, "base64");
-
-      // ── Multi-metric comparison ──
-      // Use multiple small images at different sizes for robustness
-      const sizes = [64, 128];
-      let totalScore = 0;
-      let metrics = 0;
-
-      for (const size of sizes) {
-        const [capturedRaw, storedRaw] = await Promise.all([
-          sharp(capturedBuffer).resize(size, size, { fit: 'cover' }).greyscale().raw().toBuffer(),
-          sharp(storedBuffer).resize(size, size, { fit: 'cover' }).greyscale().raw().toBuffer(),
-        ]);
-
-        // 1. Mean Absolute Difference
-        let madDiff = 0;
-        for (let i = 0; i < capturedRaw.length; i++) {
-          madDiff += Math.abs(capturedRaw[i] - storedRaw[i]);
+      // 1. Récupérer le descripteur de référence (celui enregistré à
+      //    l'inscription). Si absent (anciennes données), on le calcule
+      //    à la volée depuis la photo de référence stockée, une seule fois.
+      let storedDescriptor: Float32Array | null = null;
+      if (worker.faceDescriptor) {
+        storedDescriptor = this.faceRecognitionService.deserializeDescriptor(worker.faceDescriptor);
+      } else if (worker.facePhoto) {
+        storedDescriptor = await this.faceRecognitionService.extractDescriptor(worker.facePhoto);
+        if (storedDescriptor) {
+          // On mémorise le descriptor calculé pour accélérer les prochaines vérifications
+          await this.repository.update(worker.id, {
+            faceDescriptor: this.faceRecognitionService.serializeDescriptor(storedDescriptor),
+          });
         }
-        const avgMad = madDiff / capturedRaw.length;
-        totalScore += avgMad;
-        metrics++;
-
-        // 2. Histogram comparison (brightness distribution)
-        const histCaptured = new Array(16).fill(0);
-        const histStored = new Array(16).fill(0);
-        for (let i = 0; i < capturedRaw.length; i++) {
-          histCaptured[Math.floor(capturedRaw[i] / 16)]++;
-          histStored[Math.floor(storedRaw[i] / 16)]++;
-        }
-        let histDiff = 0;
-        for (let i = 0; i < 16; i++) {
-          histDiff += Math.abs(histCaptured[i] - histStored[i]);
-        }
-        const histScore = histDiff / capturedRaw.length;
-        totalScore += histScore * 255; // Normalize to 0-255 scale
-        metrics++;
       }
 
-      const avgScore = totalScore / metrics;
+      if (!storedDescriptor) {
+        // Aucun visage détectable sur la photo de référence — on ne peut pas
+        // comparer, on laisse passer (le PIN reste l'authentification principale).
+        return { matched: true };
+      }
 
-      // Lenient threshold: 130 (0=identical, 255=opposite)
-      // Different lighting, angle, background will produce 60-120.
-      // Completely different people typically produce >140.
-      const matched = avgScore < 130;
-      const distance = avgScore / 255;
+      // 2. Extraire le descripteur de la photo capturée à l'instant
+      const capturedDescriptor = await this.faceRecognitionService.extractDescriptor(capturedPhoto);
+      if (!capturedDescriptor) {
+        // Aucun visage détecté sur la photo capturée
+        return { matched: false, distance: 999 };
+      }
 
-      this.logger.log(`Face verify: avgScore=${avgScore.toFixed(1)}, matched=${matched}`);
+      // 3. Comparer les deux descripteurs (distance euclidienne, seuil 0.55)
+      const distance = this.faceRecognitionService.compareDescriptors(capturedDescriptor, storedDescriptor);
+      const matched = this.faceRecognitionService.isSamePerson(capturedDescriptor, storedDescriptor);
+
+      this.logger.log(`Face verify: distance=${distance.toFixed(3)}, matched=${matched}`);
       return { matched, distance };
     } catch (err) {
       this.logger.error(`Face verify failed: ${err}`);
-      // If comparison fails, still allow — PIN is primary auth
+      // Si la comparaison échoue techniquement, on laisse passer — le PIN reste l'authentification principale
       return { matched: true };
     }
   }
