@@ -40,3 +40,4 @@ coverage/
 *.pem
 .turbo/
 .deploy/
+*.tsbuildinfo
