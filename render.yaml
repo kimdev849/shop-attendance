@@ -12,9 +12,14 @@ services:
     region: frankfurt
     buildCommand: npm install && npm run build:api
     startCommand: npx prisma migrate deploy --schema=apps/api/prisma/schema.prisma && npm run start:prod --workspace=apps/api
+    healthCheckPath: /docs
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 22.x
+      - key: API_PORT
+        value: "10000"
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
@@ -41,6 +46,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 22.x
       - key: NEXT_PUBLIC_API_URL
         value: https://shop-attendance-api.onrender.com
     autoDeploy: true
