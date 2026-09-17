@@ -8,6 +8,13 @@ import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { logger: ["error", "warn", "log"] });
 
+  // Les photos faciales (photo de référence depuis le dashboard admin, photo
+  // de vérification depuis la tablette) transitent en base64 dans un body JSON.
+  // La limite par défaut d'Express (100kb) rejette ces payloads avec un 413 :
+  // on la porte à 10 MB (Nest hérite du body-parser d'Express).
+  const { json } = await import("express");
+  app.use(json({ limit: "10mb" }));
+
   app.use(helmet());
   app.enableCors({
     origin: process.env.CORS_ORIGIN?.split(",") ?? "*",
