@@ -14,7 +14,7 @@
     "dev:tablet": "cd apps/tablet-app && npm run start",
     "build:api": "npm run prisma:generate --workspace=apps/api && npm run build --workspace=apps/api",
     "build:dashboard": "npm run build --workspace=apps/admin-dashboard",
-    "db:migrate": "npm run prisma:migrate --workspace=apps/api",
+    "db:migrate": "npm run prisma:migrate:deploy --workspace=apps/api",
     "db:seed": "npm run prisma:seed --workspace=apps/api",
     "db:studio": "npm run prisma:studio --workspace=apps/api",
     "docker:up": "docker compose up -d",
