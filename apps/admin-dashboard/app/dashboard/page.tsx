@@ -104,7 +104,7 @@ export default function DashboardPage() {
 
   return (
     <AppShell title="Tableau de bord">
-      {(loading || !stats) && !dashboardError ? <DashboardSkeleton isSlow={isSlow} /> : dashboardError ? (
+      {dashboardError ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center">
           <p className="text-sm font-medium text-destructive">Erreur de chargement</p>
           <p className="text-xs text-muted-foreground">{dashboardError}</p>
@@ -112,6 +112,8 @@ export default function DashboardPage() {
             Réessayer
           </Button>
         </div>
+      ) : loading || !stats ? (
+        <DashboardSkeleton isSlow={isSlow} />
       ) : (
         <div className="space-y-4 sm:space-y-6">
           {/* Stats — 2 cols on mobile, 3 on sm, 6 on lg */}

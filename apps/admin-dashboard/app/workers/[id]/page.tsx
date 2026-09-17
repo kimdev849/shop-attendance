@@ -28,6 +28,7 @@ export default function WorkerDetailPage() {
   const [worker, setWorker] = useState<any>(null);
   const [shops, setShops] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [editOpen, setEditOpen] = useState(false);
   const [toggleOpen, setToggleOpen] = useState(false);
@@ -36,15 +37,30 @@ export default function WorkerDetailPage() {
   const { toast } = useToast();
 
   async function load() {
-    const { data } = await api.workers.get(id);
-    setWorker(data);
-    setLoading(false);
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const { data } = await api.workers.get(id);
+      setWorker(data);
+    } catch (err: any) {
+      // Sans ce catch, une erreur API laissait le skeleton tourner indéfiniment.
+      const message = err?.response?.data?.message ?? "Impossible de charger le travailleur.";
+      setLoadError(message);
+      toast(message, "error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     if (!id) return;
     load();
-    api.shops.list({ limit: 200 }).then(({ data }) => setShops(data.data ?? data));
+    api.shops
+      .list({ limit: 200 })
+      .then(({ data }) => setShops(data.data ?? data))
+      .catch(() => {
+        // Non bloquant : la liste des shops sert uniquement au formulaire d'édition.
+      });
   }, [id]);
 
   function openEdit() {
@@ -91,10 +107,28 @@ export default function WorkerDetailPage() {
     } finally { setSaving(false); }
   }
 
-  if (loading || !worker) {
+  if (loading && !worker) {
     return (
       <AppShell title="Travailleur">
         <TableSkeleton rows={4} columns={3} />
+      </AppShell>
+    );
+  }
+
+  if (!worker) {
+    return (
+      <AppShell title="Travailleur">
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
+            <p className="text-sm text-destructive">{loadError ?? "Travailleur introuvable."}</p>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => router.push("/workers")}>
+                Retour à la liste
+              </Button>
+              <Button onClick={load}>Réessayer</Button>
+            </div>
+          </CardContent>
+        </Card>
       </AppShell>
     );
   }
