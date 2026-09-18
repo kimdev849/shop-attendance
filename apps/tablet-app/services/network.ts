@@ -5,6 +5,12 @@ if (Platform.OS !== "web") {
   NetInfo = require("@react-native-community/netinfo").default;
 }
 
+/**
+ * État de connectivité de l'appareil (wifi/données) via NetInfo — SANS requête
+ * vers l'API et donc sans timeout. Attention : renvoie `true` même pendant le
+ * cold start du service Render Free (30-60 s). Pour un envoi critique, utiliser
+ * `waitForServerReady()` (services/api.ts) qui sonde réellement le serveur.
+ */
 export async function isOnline(): Promise<boolean> {
   if (Platform.OS === "web") {
     return typeof navigator !== "undefined" ? navigator.onLine : true;

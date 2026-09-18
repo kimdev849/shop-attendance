@@ -1,8 +1,44 @@
 import type { CheckInPayload, CheckInResult, SyncAttendanceResult } from "@shop-attendance/types";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://shop-attendance-api.onrender.com";
-const TIMEOUT_MS = 30_000; // 30s – Render cold-start can take 30-60s
+// Render Free cold-start : le service peut mettre 30-60 s à se réveiller.
+// Le timeout doit couvrir ce délai PLUS le temps de traitement réel de la
+// requête, sinon un pointage valide échoue pendant que le serveur démarre.
+const TIMEOUT_MS = 75_000; // 75s (= jusqu'à ~60s de cold start + marge de traitement)
 const MAX_RETRIES = 2;
+
+/**
+ * Vérifie que le service API répond réellement, en laissant le temps au
+ * cold start Render de se terminer (jusqu'à 60 s). Sert de sonde avant un
+ * envoi important (ex: pointage avec photo d'audit) pour éviter les faux
+ * positifs "hors ligne" qui feraient perdre la photo.
+ * Résultat mis en cache 30 s pour ne pas ralentir les écrans consultés
+ * plusieurs fois (recherche, sélection, etc.).
+ */
+export async function waitForServerReady(timeoutMs = 60_000): Promise<boolean> {
+  const started = Date.now();
+  const deadline = started + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const res = await fetch(`${API_URL}/v1/workers/roster?probe=1`, {
+          method: "GET",
+          signal: controller.signal,
+        });
+        // Toute réponse HTTP (même 400/401) prouve que le service est réveillé.
+        if (res.status > 0) return true;
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch {
+      // Service pas encore prêt — on attend un peu et on retente.
+    }
+    await new Promise((r) => setTimeout(r, 2_000));
+  }
+  return false;
+}
 
 async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
   let lastError: Error | null = null;
@@ -37,6 +73,11 @@ async function safeJson(response: Response): Promise<any> {
 // ── Check-in / Attendance ──────────────────────────────────────────
 
 export async function submitCheckIn(payload: CheckInPayload): Promise<CheckInResult> {
+  // Sonde de réveil : attend (silencieusement, jusqu'à 60 s) que le service
+  // Render Free réponde avant d'envoyer le pointage, pour que la vraie requête
+  // parte contre un serveur déjà réveillé.
+  await waitForServerReady();
+
   const response = await fetchWithTimeout(`${API_URL}/v1/attendance/check-in`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

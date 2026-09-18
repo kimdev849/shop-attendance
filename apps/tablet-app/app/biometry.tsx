@@ -18,7 +18,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { PrimaryButton } from "../components/primary-button";
 import { theme } from "../components/theme";
-import { submitCheckIn, getFacePhotoForCheckIn } from "../services/api";
+import { submitCheckIn, getFacePhotoForCheckIn, waitForServerReady } from "../services/api";
 import { isOnline } from "../services/network";
 import { getDeviceConfig } from "../storage/device-config";
 import { enqueueAttendance } from "../storage/attendance-queue";
@@ -37,6 +37,7 @@ export default function BiometryScreen() {
   const [step, setStep] = useState<Step>("loading");
   const [message, setMessage] = useState<string | null>(null);
   const [attendanceType, setAttendanceType] = useState<"CHECK_IN" | "CHECK_OUT">("CHECK_IN");
+  const [waitingServer, setWaitingServer] = useState(false);
 
   useEffect(() => {
     if (!worker) {
@@ -115,8 +116,16 @@ export default function BiometryScreen() {
         checkInPhoto: checkInPhoto ?? undefined,
       };
 
+      // Réveil du serveur (cold start Render Free 30-60 s) : sonde avec
+      // message visible au lieu d'un spinner figé sans explication. Si le
+      // serveur ne répond toujours pas après 60 s, on retombe sur la file
+      // offline (sans photo) comme pour une vraie coupure réseau.
+      setWaitingServer(true);
+      const serverReady = await waitForServerReady();
+      setWaitingServer(false);
+
       const online = await isOnline();
-      if (online) {
+      if (online && serverReady) {
         const res = await submitCheckIn(payload);
         setResult({ ...res, queuedOffline: false });
       } else {
@@ -225,7 +234,9 @@ export default function BiometryScreen() {
       {step === "submitting" && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.hint}>Envoi du pointage...</Text>
+          <Text style={styles.hint}>
+            {waitingServer ? "Connexion au serveur..." : "Envoi du pointage..."}
+          </Text>
         </View>
       )}
 
