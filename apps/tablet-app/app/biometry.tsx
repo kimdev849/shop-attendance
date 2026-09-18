@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -16,20 +14,21 @@ import {
   ArrowLeft,
   ShieldCheck,
   Camera,
-  XCircle,
-  Info,
 } from "phosphor-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { PrimaryButton } from "../components/primary-button";
 import { theme } from "../components/theme";
-import { submitCheckIn, getFacePhotoForCheckIn, verifyFace } from "../services/api";
+import { submitCheckIn, getFacePhotoForCheckIn } from "../services/api";
 import { isOnline } from "../services/network";
 import { getDeviceConfig } from "../storage/device-config";
 import { enqueueAttendance } from "../storage/attendance-queue";
 import { generateId } from "../lib/uid";
 import { useCheckInFlow } from "../lib/flow-context";
 
-type Step = "loading" | "ready" | "camera" | "comparing" | "success" | "face_error" | "submit_error";
+// Flux simplifié : sélection du nom → mot de passe → photo. La photo est un
+// audit (stockée 28 jours) et ne bloque jamais le pointage. Aucune comparaison
+// faciale (désactivé — flux simplifié avec mot de passe, code gardé au cas où).
+type Step = "loading" | "ready" | "camera" | "submitting" | "success" | "submit_error";
 
 export default function BiometryScreen() {
   const router = useRouter();
@@ -37,10 +36,7 @@ export default function BiometryScreen() {
   const { worker, setResult } = useCheckInFlow();
   const [step, setStep] = useState<Step>("loading");
   const [message, setMessage] = useState<string | null>(null);
-  const [hasRefPhoto, setHasRefPhoto] = useState(false);
   const [attendanceType, setAttendanceType] = useState<"CHECK_IN" | "CHECK_OUT">("CHECK_IN");
-  const [refPhotoUri, setRefPhotoUri] = useState<string | null>(null);
-  const [capturedUri, setCapturedUri] = useState<string | null>(null);
 
   useEffect(() => {
     if (!worker) {
@@ -54,16 +50,11 @@ export default function BiometryScreen() {
     try {
       const config = await getDeviceConfig();
       if (!config) { setStep("submit_error"); setMessage("Tablette non configurée."); return; }
+      // Sert uniquement à déterminer CHECK_IN vs CHECK_OUT — aucune comparaison faciale.
       const data = await getFacePhotoForCheckIn(worker!.employeeNumber, config.shopId);
-      const hasPhoto = !!data?.facePhoto;
-      setHasRefPhoto(hasPhoto);
-      if (hasPhoto && data?.facePhoto) {
-        setRefPhotoUri(data.facePhoto);
-      }
       setAttendanceType(data?.nextAction ?? "CHECK_IN");
       setStep("ready");
     } catch {
-      setHasRefPhoto(false);
       setAttendanceType("CHECK_IN");
       setStep("ready");
     }
@@ -80,9 +71,8 @@ export default function BiometryScreen() {
       return;
     }
 
-    // 2. Camera
+    // 2. Photo (audit — ne bloque jamais le pointage)
     let photoData: string | null = null;
-    let localUri: string | null = null;
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ["images" as const],
@@ -92,50 +82,24 @@ export default function BiometryScreen() {
       });
 
       if (result.canceled || !result.assets?.[0] || !result.assets[0].base64) {
+        // Pas de photo prise : on revient à l'écran précédent du flux
         setStep("ready");
         return;
       }
 
       photoData = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      localUri = result.assets[0].uri;
-      setCapturedUri(localUri);
     } catch (err: any) {
       setStep("submit_error");
       setMessage("Impossible d'ouvrir la caméra: " + (err?.message ?? "Erreur inconnue"));
       return;
     }
 
-    // 3. Face verification (mandatory — both PIN + photo are required)
-    if (hasRefPhoto && photoData) {
-      setStep("comparing");
-      try {
-        const config = await getDeviceConfig();
-        if (!config || !worker) throw new Error("Config manquante.");
-        const faceResult = await verifyFace(worker.employeeNumber, config.shopId, photoData);
-        if (!faceResult.matched) {
-          setStep("face_error");
-          setMessage("Le visage ne correspond pas à la photo enregistrée. Réessayez.");
-          return;
-        }
-      } catch (err: any) {
-        const msg = err?.message ?? "";
-        // If endpoint not found or network — still proceed
-        if (msg.includes("404") || msg.includes("Not Found") || msg.includes("fetch") || msg.includes("Network")) {
-          // OK
-        } else {
-          setStep("face_error");
-          setMessage("Erreur de vérification faciale. Réessayez.");
-          return;
-        }
-      }
-    }
-
-    // 4. Submit
-    await doCheckIn();
+    // 3. Pointage (la photo est envoyée en audit, sans validation faciale)
+    await doCheckIn(photoData);
   }
 
-  async function doCheckIn() {
-    setStep("comparing");
+  async function doCheckIn(checkInPhoto: string | null) {
+    setStep("submitting");
     try {
       const config = await getDeviceConfig();
       if (!config || !worker) throw new Error("Config manquante.");
@@ -148,6 +112,7 @@ export default function BiometryScreen() {
         clientRequestId: generateId(),
         biometricConfirmed: true,
         type: attendanceType,
+        checkInPhoto: checkInPhoto ?? undefined,
       };
 
       const online = await isOnline();
@@ -155,7 +120,10 @@ export default function BiometryScreen() {
         const res = await submitCheckIn(payload);
         setResult({ ...res, queuedOffline: false });
       } else {
-        await enqueueAttendance({ ...payload, queuedAt: new Date().toISOString() });
+        // Hors ligne : on retire la photo pour ne pas alourdir la file locale
+        // (AsyncStorage) — l'audit photo ne concerne que les pointages en ligne.
+        const { checkInPhoto: _photo, ...payloadWithoutPhoto } = payload;
+        await enqueueAttendance({ ...payloadWithoutPhoto, queuedAt: new Date().toISOString() });
         setResult({
           attendanceId: payload.clientRequestId,
           workerFullName: `${worker.firstName} ${worker.lastName}`,
@@ -179,7 +147,7 @@ export default function BiometryScreen() {
           const payload = {
             workerId: worker.id, shopId: config.shopId, deviceId: config.deviceId,
             clientTimestamp: new Date().toISOString(), clientRequestId: generateId(),
-            biometricConfirmed: true, queuedAt: new Date().toISOString(),
+            biometricConfirmed: true, type: attendanceType, queuedAt: new Date().toISOString(),
           };
           await enqueueAttendance(payload);
           setResult({
@@ -200,7 +168,6 @@ export default function BiometryScreen() {
 
   function handleRetry() {
     setMessage(null);
-    setCapturedUri(null);
     setStep("ready");
   }
 
@@ -226,21 +193,19 @@ export default function BiometryScreen() {
             <ShieldCheck size={36} color={theme.colors.primary} weight="fill" />
           </View>
           <Text style={styles.title}>
-            {attendanceType === "CHECK_OUT" ? "Pointage de sortie" : "Authentification"}
+            {attendanceType === "CHECK_OUT" ? "Pointage de sortie" : "Dernière étape"}
           </Text>
           <Text style={styles.subtitle}>
             {worker?.firstName} {worker?.lastName}
           </Text>
           <Text style={styles.hint}>
             {attendanceType === "CHECK_OUT"
-              ? "Vous avez déjà pointé aujourd'hui"
-              : hasRefPhoto
-                ? "Votre visage sera comparé à la photo enregistrée"
-                : "Capturez une photo pour confirmer votre présence"}
+              ? "Vous avez déjà pointé aujourd'hui. Prenez une photo pour valider votre sortie."
+              : "Prenez une photo pour confirmer votre présence."}
           </Text>
           <View style={{ height: 32 }} />
           <PrimaryButton
-            label={attendanceType === "CHECK_OUT" ? "Pointer la sortie" : "S'authentifier"}
+            label={attendanceType === "CHECK_OUT" ? "Pointer la sortie" : "Prendre une photo"}
             onPress={handleCapture}
             icon={<Camera size={18} color="#fff" weight="bold" />}
             fullWidth
@@ -256,13 +221,11 @@ export default function BiometryScreen() {
         </View>
       )}
 
-      {/* ── Comparing / Submitting ── */}
-      {step === "comparing" && (
+      {/* ── Submitting ── */}
+      {step === "submitting" && (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
-          <Text style={styles.hint}>
-            {hasRefPhoto ? "Vérification du visage..." : "Envoi du pointage..."}
-          </Text>
+          <Text style={styles.hint}>Envoi du pointage...</Text>
         </View>
       )}
 
@@ -273,60 +236,8 @@ export default function BiometryScreen() {
             <CheckCircle size={48} color={theme.colors.success} weight="fill" />
           </View>
           <Text style={styles.successText}>
-            {attendanceType === "CHECK_OUT" ? "Sortie enregistrée" : "Pointage enregistré"}
+            {attendanceType === "CHECK_OUT" ? "Sortie enregistrée" : "Pointage réussi"}
           </Text>
-        </View>
-      )}
-
-      {/* ── Face Verification Error ── */}
-      {step === "face_error" && (
-        <View style={styles.errorContainer}>
-          <View style={styles.faceErrorCard}>
-            {/* Header */}
-            <View style={styles.faceErrorHeader}>
-              <View style={styles.iconRedSmall}>
-                <XCircle size={24} color={theme.colors.danger} weight="fill" />
-              </View>
-              <Text style={styles.faceErrorTitle}>Visage non reconnu</Text>
-            </View>
-
-            {/* Photo comparison */}
-            <View style={styles.photoCompare}>
-              {refPhotoUri ? (
-                <View style={styles.photoBox}>
-                  <Image source={{ uri: refPhotoUri }} style={styles.photoImg} resizeMode="cover" />
-                  <Text style={styles.photoLabel}>Photo enregistrée</Text>
-                </View>
-              ) : null}
-              {capturedUri ? (
-                <View style={styles.photoBox}>
-                  <Image source={{ uri: capturedUri }} style={styles.photoImg} resizeMode="cover" />
-                  <Text style={styles.photoLabel}>Photo capturée</Text>
-                </View>
-              ) : null}
-            </View>
-
-            {/* Message */}
-            <Text style={styles.faceErrorMsg}>{message}</Text>
-
-            {/* Tips */}
-            <View style={styles.tipsCard}>
-              <Info size={14} color={theme.colors.textMuted} weight="bold" />
-              <Text style={styles.tipsText}>
-                {"Assurez-vous d'être bien face à la caméra, avec un éclairage suffisant."}
-              </Text>
-            </View>
-          </View>
-
-          <View style={{ height: 24 }} />
-          <PrimaryButton label="Réessayer" onPress={handleRetry} fullWidth />
-          <View style={{ height: 12 }} />
-          <PrimaryButton
-            label="Retour"
-            variant="secondary"
-            onPress={() => router.replace("/identification")}
-            fullWidth
-          />
         </View>
       )}
 
@@ -388,58 +299,4 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: "rgba(239,68,68,0.15)",
   },
   errorText: { color: theme.colors.danger, fontSize: 20, fontWeight: "800" },
-  // ── Face error screen ──
-  errorContainer: {
-    flex: 1, alignItems: "center", justifyContent: "center",
-    paddingHorizontal: 20,
-  },
-  faceErrorCard: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: 20,
-    padding: 24,
-    width: "100%",
-    maxWidth: 400,
-    borderWidth: 1,
-    borderColor: "rgba(239,68,68,0.15)",
-    ...theme.shadow,
-  },
-  faceErrorHeader: {
-    flexDirection: "row", alignItems: "center", gap: 12,
-    marginBottom: 20,
-  },
-  iconRedSmall: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: "rgba(239,68,68,0.1)",
-    alignItems: "center", justifyContent: "center",
-  },
-  faceErrorTitle: {
-    color: theme.colors.danger, fontSize: 18, fontWeight: "700",
-  },
-  photoCompare: {
-    flexDirection: "row", gap: 12, marginBottom: 16,
-  },
-  photoBox: {
-    flex: 1, alignItems: "center", gap: 6,
-  },
-  photoImg: {
-    width: "100%", height: 120, borderRadius: 12,
-    backgroundColor: theme.colors.surfaceAlt,
-    borderWidth: 1, borderColor: theme.colors.border,
-  },
-  photoLabel: {
-    color: theme.colors.textMuted, fontSize: 11, fontWeight: "600",
-  },
-  faceErrorMsg: {
-    color: theme.colors.textSecondary, fontSize: 14,
-    textAlign: "center", lineHeight: 20, marginBottom: 16,
-  },
-  tipsCard: {
-    flexDirection: "row", alignItems: "flex-start", gap: 8,
-    backgroundColor: theme.colors.background,
-    borderRadius: 12, padding: 12,
-    borderWidth: 1, borderColor: theme.colors.border,
-  },
-  tipsText: {
-    color: theme.colors.textMuted, fontSize: 12, lineHeight: 18, flex: 1,
-  },
 });

@@ -45,8 +45,14 @@ export class FaceRecognitionService implements OnModuleInit {
   private modelsLoaded = false;
   private modelsLoading: Promise<void> | null = null;
 
-  /** Seuil de distance euclidienne : < 0.55 = même personne (valeur standard face-api.js) */
-  private readonly MATCH_THRESHOLD = 0.55;
+  /**
+   * Seuil de distance euclidienne : < 0.55 = même personne (valeur standard
+   * face-api.js). Surchargeable via FACE_MATCH_THRESHOLD pour ajuster la
+   * sensibilité en production (plus haut = plus tolérant).
+   */
+  private readonly MATCH_THRESHOLD = Number.isFinite(Number(process.env.FACE_MATCH_THRESHOLD))
+    ? Number(process.env.FACE_MATCH_THRESHOLD)
+    : 0.55;
 
   async onModuleInit() {
     // Précharge les modèles au démarrage du serveur pour éviter un délai
@@ -114,27 +120,31 @@ export class FaceRecognitionService implements OnModuleInit {
   async extractDescriptor(base64Image: string): Promise<Float32Array | null> {
     await this.loadModels();
     const faceapi = await this.ensureFaceApi();
-    const { loadImage, createCanvas } = await import("@napi-rs/canvas");
+    const sharp = (await import("sharp")).default;
 
     const cleaned = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(cleaned, "base64");
-    const img = await loadImage(buffer);
 
-    // Décodage → ImageData → tenseur RGB [h, w, 3] : face-api consomme des
-    // tenseurs, jamais de canvas (sinon il instancierait un Canvas sans
-    // dimensions, ce que @napi-rs/canvas refuse).
-    const canvas = createCanvas(img.width, img.height);
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    // sharp applique l'auto-orientation EXIF (les photos de la tablette Expo
+    // gardent l'orientation en métadonnée sans l'appliquer aux pixels) puis
+    // décode en pixels RGB bruts. On limite la taille pour éviter de créer
+    // un tenseur géant (les photos 12 MP feraient ~150 Mo en int32).
+    const { data, info } = await sharp(buffer)
+      .rotate()
+      .resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true })
+      .removeAlpha()
+      .toColourspace("srgb")
+      .raw()
+      .toBuffer({ resolveWithObject: true });
 
+    if (info.channels !== 3) {
+      throw new Error(`Format d'image inattendu (${info.channels} canaux au lieu de 3).`);
+    }
+
+    // face-api consomme directement un tenseur RGB [h, w, 3] — jamais de
+    // canvas (l'approche de la démo node-wasm officielle du package).
     const tf = await import("@tensorflow/tfjs");
-    const input = tf.tidy(() => {
-      const rgba = tf.tensor(imageData.data, [canvas.height, canvas.width, 4], "int32");
-      const channels = tf.split(rgba, 4, 2);
-      const rgb = tf.stack([channels[0], channels[1], channels[2]], 2);
-      return tf.squeeze(rgb);
-    });
+    const input = tf.tensor(data, [info.height, info.width, 3], "int32");
 
     try {
       const detection = await faceapi

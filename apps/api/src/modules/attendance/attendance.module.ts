@@ -6,9 +6,10 @@ import { AuditModule } from "../audit/audit.module";
 import { DevicesModule } from "../devices/devices.module";
 import { SchedulesModule } from "../schedules/schedules.module";
 import { PenaltiesModule } from "../penalties/penalties.module";
+import { WorkersModule } from "../workers/workers.module";
 
 @Module({
-  imports: [AuditModule, DevicesModule, SchedulesModule, PenaltiesModule],
+  imports: [AuditModule, DevicesModule, SchedulesModule, PenaltiesModule, WorkersModule],
   providers: [AttendanceService, AttendanceRepository],
   controllers: [AttendanceController],
   exports: [AttendanceService],

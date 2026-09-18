@@ -9,6 +9,7 @@ import { AuditService } from "../audit/audit.service";
 import { DevicesService } from "../devices/devices.service";
 import { SchedulesService } from "../schedules/schedules.service";
 import { PenaltyCalculatorService } from "../penalties/penalty-calculator.service";
+import { CheckInPhotoService } from "../workers/check-in-photo.service";
 import { AttendanceRepository } from "./attendance.repository";
 import { CheckInDto } from "./dto/check-in.dto";
 import { QueryAttendanceDto } from "./dto/query-attendance.dto";
@@ -42,6 +43,7 @@ export class AttendanceService {
     private readonly devicesService: DevicesService,
     private readonly schedulesService: SchedulesService,
     private readonly penaltyCalculator: PenaltyCalculatorService,
+    private readonly checkInPhotoService: CheckInPhotoService,
   ) {}
 
   async checkIn(dto: CheckInDto): Promise<CheckInResult> {
@@ -107,6 +109,18 @@ export class AttendanceService {
       // Mettre à jour avec l'heure de sortie
       const updated = await this.repository.updateCheckOut(existingForDay.id, clientTime);
 
+      // Audit photo (optionnel, jamais bloquant) si une photo est fournie
+      if (dto.checkInPhoto) {
+        try {
+          const uploaded = await this.checkInPhotoService.uploadCheckInPhoto(dto.checkInPhoto, worker.employeeNumber);
+          if (uploaded) {
+            await this.repository.updateCheckInPhoto(updated.id, uploaded.url, uploaded.expiresAt);
+          }
+        } catch (err) {
+          this.logger.warn(`Upload photo de pointage (check-out) ignoré: ${err}`);
+        }
+      }
+
       await this.auditService.log({
         action: "ATTENDANCE_CHECK_OUT",
         entity: "Attendance",
@@ -160,6 +174,22 @@ export class AttendanceService {
         : 0;
 
     // 9. Enregistrer le pointage (+ pénalité PENDING si applicable)
+    // Audit photo : upload best-effort de la photo capturée (Cloudinary, 28 jours).
+    // Un échec d'upload ne bloque JAMAIS le pointage.
+    let checkInPhotoUrl: string | null = null;
+    let checkInPhotoExpiresAt: Date | null = null;
+    if (dto.checkInPhoto) {
+      try {
+        const uploaded = await this.checkInPhotoService.uploadCheckInPhoto(dto.checkInPhoto, worker.employeeNumber);
+        if (uploaded) {
+          checkInPhotoUrl = uploaded.url;
+          checkInPhotoExpiresAt = uploaded.expiresAt;
+        }
+      } catch (err) {
+        this.logger.warn(`Upload photo de pointage ignoré: ${err}`);
+      }
+    }
+
     let attendance;
     try {
       attendance = await this.repository.create({
@@ -173,6 +203,8 @@ export class AttendanceService {
         status,
         syncStatus: "SYNCED",
         clientRequestId: dto.clientRequestId,
+        checkInPhotoUrl,
+        checkInPhotoExpiresAt,
       });
     } catch (error: any) {
       // Race condition: un autre appel concurrent (ex: double-tap ou retry

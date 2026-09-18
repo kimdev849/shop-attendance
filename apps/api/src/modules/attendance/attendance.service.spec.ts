@@ -42,6 +42,7 @@ describe("AttendanceService", () => {
       devicesService,
       schedulesService,
       penaltyCalculator,
+      { uploadCheckInPhoto: jest.fn().mockResolvedValue(null) } as any,
     );
   });
 

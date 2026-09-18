@@ -35,6 +35,7 @@ export class SyncService {
           clientTimestamp: item.clientTimestamp,
           clientRequestId: item.clientRequestId,
           biometricConfirmed: item.biometricConfirmed,
+          checkInPhoto: item.checkInPhoto,
         });
 
         results.push({

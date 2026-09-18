@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsBoolean, IsISO8601, IsOptional, IsString, IsUUID } from "class-validator";
+import { IsBoolean, IsISO8601, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
 
 export class CheckInDto {
   @ApiProperty({ description: "ID du travailleur qui pointe" })
@@ -42,4 +42,15 @@ export class CheckInDto {
   @IsOptional()
   @IsString()
   type?: "CHECK_IN" | "CHECK_OUT";
+
+  @ApiProperty({
+    description:
+      "Photo de pointage capturée sur la tablette (data URL base64). Audit uniquement: " +
+      "stockée sur Cloudinary avec expiration 28 jours, elle ne bloque JAMAIS le pointage.",
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(15_000_000) // ~10 MB de base64 (limite body JSON de main.ts)
+  checkInPhoto?: string;
 }

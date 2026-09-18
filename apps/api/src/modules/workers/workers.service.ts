@@ -7,7 +7,9 @@ import { CreateWorkerDto } from "./dto/create-worker.dto";
 import { UpdateWorkerDto } from "./dto/update-worker.dto";
 import { AssignScheduleDto } from "./dto/assign-schedule.dto";
 import { WorkerLookupResult, PinVerificationResult, WorkerRosterItem } from "./types/workers.types";
-import { FaceRecognitionService } from "./face-recognition.service";
+// désactivé — flux simplifié avec mot de passe, code gardé au cas où
+// import { FaceRecognitionService } from "./face-recognition.service";
+import { CheckInPhotoService } from "./check-in-photo.service";
 
 @Injectable()
 export class WorkersService {
@@ -16,7 +18,9 @@ export class WorkersService {
   constructor(
     private readonly repository: WorkersRepository,
     private readonly auditService: AuditService,
-    private readonly faceRecognitionService: FaceRecognitionService,
+    // désactivé — flux simplifié avec mot de passe, code gardé au cas où
+    // private readonly faceRecognitionService: FaceRecognitionService,
+    private readonly checkInPhotoService: CheckInPhotoService,
   ) {}
 
   async create(dto: CreateWorkerDto, actorUserId?: string) {
@@ -279,53 +283,10 @@ export class WorkersService {
     return { facePhoto: worker.facePhoto ?? null, faceDescriptor: worker.faceDescriptor ?? null, nextAction };
   }
 
-  async verifyFace(employeeNumber: string, shopId: string, capturedPhoto: string): Promise<{ matched: boolean; distance?: number }> {
-    const worker = await this.repository.findByEmployeeNumber(employeeNumber);
-    if (!worker || worker.status !== "ACTIVE" || worker.shopId !== shopId) {
-      return { matched: false };
-    }
-    try {
-      // 1. Récupérer le descripteur de référence (celui enregistré à
-      //    l'inscription). Si absent (anciennes données), on le calcule
-      //    à la volée depuis la photo de référence stockée, une seule fois.
-      let storedDescriptor: Float32Array | null = null;
-      if (worker.faceDescriptor) {
-        storedDescriptor = this.faceRecognitionService.deserializeDescriptor(worker.faceDescriptor);
-      } else if (worker.facePhoto) {
-        storedDescriptor = await this.faceRecognitionService.extractDescriptor(worker.facePhoto);
-        if (storedDescriptor) {
-          // On mémorise le descriptor calculé pour accélérer les prochaines vérifications
-          await this.repository.update(worker.id, {
-            faceDescriptor: this.faceRecognitionService.serializeDescriptor(storedDescriptor),
-          });
-        }
-      }
-
-      if (!storedDescriptor) {
-        // Aucun visage détectable sur la photo de référence — on ne peut pas
-        // comparer, on laisse passer (le PIN reste l'authentification principale).
-        return { matched: true };
-      }
-
-      // 2. Extraire le descripteur de la photo capturée à l'instant
-      const capturedDescriptor = await this.faceRecognitionService.extractDescriptor(capturedPhoto);
-      if (!capturedDescriptor) {
-        // Aucun visage détecté sur la photo capturée
-        return { matched: false, distance: 999 };
-      }
-
-      // 3. Comparer les deux descripteurs (distance euclidienne, seuil 0.55)
-      const distance = this.faceRecognitionService.compareDescriptors(capturedDescriptor, storedDescriptor);
-      const matched = this.faceRecognitionService.isSamePerson(capturedDescriptor, storedDescriptor);
-
-      this.logger.log(`Face verify: distance=${distance.toFixed(3)}, matched=${matched}`);
-      return { matched, distance };
-    } catch (err) {
-      this.logger.error(`Face verify failed: ${err}`);
-      // Si la comparaison échoue techniquement, on laisse passer — le PIN reste l'authentification principale
-      return { matched: true };
-    }
-  }
+  // désactivé — flux simplifié avec mot de passe, code gardé au cas où
+  // (l'endpoint POST /verify-face et la méthode verifyFace ont été supprimés :
+  // aucun client ne les appelait plus. Le seul chemin d'upload photo passe
+  // désormais par attendance.service.ts (checkInPhoto du CheckInDto).)
 
   async removeFacePhoto(id: string, actorUserId?: string) {
     await this.ensureExists(id);

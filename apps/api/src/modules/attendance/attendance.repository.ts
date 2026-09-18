@@ -35,6 +35,8 @@ export class AttendanceRepository {
     status: AttendanceStatus;
     syncStatus: string;
     clientRequestId: string;
+    checkInPhotoUrl?: string | null;
+    checkInPhotoExpiresAt?: Date | null;
   }) {
     return this.prisma.attendance.create({
       data: {
@@ -73,6 +75,14 @@ export class AttendanceRepository {
     return this.prisma.attendance.update({
       where: { id },
       data: { checkOutTime },
+      include: { worker: true, penalty: true },
+    });
+  }
+
+  async updateCheckInPhoto(id: string, checkInPhotoUrl: string, checkInPhotoExpiresAt: Date) {
+    return this.prisma.attendance.update({
+      where: { id },
+      data: { checkInPhotoUrl, checkInPhotoExpiresAt },
       include: { worker: true, penalty: true },
     });
   }

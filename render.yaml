@@ -32,6 +32,14 @@ services:
         value: 7d
       - key: CORS_ORIGIN
         value: https://shop-attendance-dashboard.onrender.com
+      # Photos de pointage (audit) : upload Cloudinary, expiration 28 jours.
+      # sync: false → à renseigner manuellement dans le dashboard Render.
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
     autoDeploy: true
 
   # ---------------------------------------------------------------------------

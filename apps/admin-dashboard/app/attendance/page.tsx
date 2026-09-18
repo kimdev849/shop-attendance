@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Clock, Search, RotateCcw } from "lucide-react";
+import { Camera, Clock, Search, RotateCcw } from "lucide-react";
 import { AppShell } from "@/components/layout/shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ export default function AttendancePage() {
   const [page, setPage] = useState(1);
   const [sortBy, setSortBy] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [lightbox, setLightbox] = useState<{ url: string; title: string } | null>(null);
 
   useEffect(() => {
     api.shops.list({ limit: 200 }).then(({ data }) => setShops(data.data ?? data));
@@ -68,6 +69,13 @@ export default function AttendancePage() {
 
   const hasFilters = search || filters.from || filters.to || filters.shopId || filters.status;
   const attendances = result?.data ?? [];
+
+  /** État de la photo d'audit pour une ligne de pointage. */
+  function photoState(a: any): "none" | "expired" | "available" {
+    if (!a.checkInPhotoUrl) return "none";
+    if (a.checkInPhotoExpiresAt && new Date(a.checkInPhotoExpiresAt).getTime() < Date.now()) return "expired";
+    return "available";
+  }
 
   return (
     <AppShell title="Pointages">
@@ -121,6 +129,7 @@ export default function AttendancePage() {
                     <SortableHead label="Heure réelle" field="checkInTime" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
                     <SortableHead label="Retard" field="latenessMinutes" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
                     <SortableHead label="Statut" field="status" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                    <TableHead>Photo</TableHead>
                     <TableHead>Appareil</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -134,6 +143,31 @@ export default function AttendancePage() {
                       <TableCell>{formatTime(a.checkInTime)}</TableCell>
                       <TableCell>{a.latenessMinutes > 0 ? `${a.latenessMinutes} min` : "—"}</TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
+                      <TableCell>
+                        {photoState(a) === "available" && (
+                          <button
+                            type="button"
+                            onClick={() => setLightbox({ url: a.checkInPhotoUrl, title: `${a.worker.firstName} ${a.worker.lastName} — ${formatDate(a.attendanceDate)}` })}
+                            className="group relative block h-10 w-14 overflow-hidden rounded-md border border-border transition-opacity hover:opacity-80"
+                            title="Voir la photo de pointage"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={a.checkInPhotoUrl}
+                              alt={`Photo de pointage de ${a.worker.firstName} ${a.worker.lastName}`}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                            <Camera className="absolute bottom-0.5 right-0.5 h-3 w-3 text-white drop-shadow" />
+                          </button>
+                        )}
+                        {photoState(a) === "expired" && (
+                          <span className="text-xs italic text-muted-foreground">Photo expirée</span>
+                        )}
+                        {photoState(a) === "none" && (
+                          <span className="text-xs text-muted-foreground">Aucune photo</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">{a.device?.name ?? "—"}</TableCell>
                     </TableRow>
                   ))}
@@ -144,6 +178,32 @@ export default function AttendancePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Lightbox photo de pointage */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <div
+            className="max-h-full w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-card shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <p className="text-sm font-semibold">{lightbox.title}</p>
+              <button
+                type="button"
+                onClick={() => setLightbox(null)}
+                className="rounded-md px-2 py-1 text-sm text-muted-foreground hover:bg-muted"
+              >
+                Fermer ✕
+              </button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={lightbox.url} alt={lightbox.title} className="max-h-[75vh] w-full object-contain bg-black" />
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

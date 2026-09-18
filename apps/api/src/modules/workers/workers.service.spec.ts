@@ -12,7 +12,7 @@ describe("WorkersService", () => {
       schedule: { upsert: jest.fn() },
     };
     auditService = { log: jest.fn() };
-    service = new WorkersService(prisma, auditService);
+    service = new WorkersService(prisma, auditService, { uploadCheckInPhoto: jest.fn().mockResolvedValue(null) } as any);
   });
 
   describe("create", () => {

@@ -217,6 +217,8 @@ model Attendance {
   status            AttendanceStatus @default(ON_TIME)
   syncStatus        SyncStatus       @default(SYNCED)
   clientRequestId   String?          @unique // idempotency key from the tablet, prevents duplicates
+  checkInPhotoUrl        String?     // URL Cloudinary de la photo capturée au pointage (audit, expire sous 28 jours)
+  checkInPhotoExpiresAt  DateTime?   // Date d'expiration de la photo d'audit (28 jours après le check-in)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 

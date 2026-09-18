@@ -14,6 +14,10 @@ export interface Attendance {
   checkInTime: string;
   latenessMinutes: number;
   status: string;
+  /** URL Cloudinary de la photo de pointage (audit, expire sous 28 jours) — null si absente/expirée. */
+  checkInPhotoUrl: string | null;
+  /** Date d'expiration de la photo d'audit (28 jours après le check-in). */
+  checkInPhotoExpiresAt: string | null;
   worker: {
     id: string;
     firstName: string;
@@ -28,7 +32,7 @@ export interface Attendance {
   device: {
     id: string;
     name: string;
-  };
+  } | null;
   penalty?: any;
 }
 

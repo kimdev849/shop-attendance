@@ -23,6 +23,8 @@ export interface CheckInPayload {
   clientRequestId: string; // idempotency key, generated on the device
   biometricConfirmed: boolean;
   type?: "CHECK_IN" | "CHECK_OUT"; // Auto-detected by server if omitted
+  /** Photo de pointage (data URL base64) — audit Cloudinary 28 jours, jamais bloquante. */
+  checkInPhoto?: string;
 }
 
 export interface CheckInResult {
