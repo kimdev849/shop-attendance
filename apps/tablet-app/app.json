@@ -21,9 +21,10 @@
     "android": {
       "package": "com.staffgo.app",
       "permissions": [
-        "USE_BIOMETRIC",
-        "USE_FINGERPRINT",
-        "CAMERA"
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#0F2A43"
@@ -52,7 +53,11 @@
     "extra": {
       "router": {
         "origin": false
+      },
+      "eas": {
+        "projectId": "0e1cd86a-c22d-4396-9e11-5f06b9e6c238"
       }
-    }
+    },
+    "owner": "mwassi"
   }
 }
