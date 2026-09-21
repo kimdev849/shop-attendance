@@ -123,6 +123,10 @@ export const api = {
     getFacePhoto: (id: string) => apiClient.get(`/workers/${id}/face-photo`),
     removeFacePhoto: (id: string) => { invalidateDomain("workers"); return apiClient.patch(`/workers/${id}/remove-face-photo`); },
   },
+  schedules: {
+    update: (id: string, data: any) => { invalidateDomain("workers"); return apiClient.patch(`/schedules/${id}`, data); },
+    remove: (id: string) => { invalidateDomain("workers"); return apiClient.delete(`/schedules/${id}`); },
+  },
   attendance: {
     list: (params?: Record<string, string | number | undefined>) => cachedGet("/attendance", params),
     get: (id: string) => cachedGet(`/attendance/${id}`),

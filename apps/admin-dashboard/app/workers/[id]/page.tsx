@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Phone, Mail, Store, ArrowLeft, Pencil, Power, PowerOff } from "lucide-react";
+import { Phone, Mail, Store, ArrowLeft, Pencil, Power, PowerOff, Plus, Trash2 } from "lucide-react";
 import { AppShell } from "@/components/layout/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,10 @@ export default function WorkerDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [toggleOpen, setToggleOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduleSaving, setScheduleSaving] = useState(false);
+  const [scheduleDeleting, setScheduleDeleting] = useState<string | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({ id: "", dayOfWeek: "MONDAY", startTime: "08:00", endTime: "17:00", toleranceMinutes: "10" });
   const [form, setForm] = useState({ employeeNumber: "", firstName: "", lastName: "", phone: "", email: "", position: "", shopId: "" });
   const { toast } = useToast();
 
@@ -87,6 +91,65 @@ export default function WorkerDetailPage() {
     } catch (err: any) {
       toast(err?.response?.data?.message ?? "Erreur.", "error");
     } finally { setSaving(false); }
+  }
+
+  function canManageSchedules() {
+    return isAdmin || authUser?.role === "SHOP_MANAGER";
+  }
+
+  function openScheduleCreate() {
+    setScheduleForm({ id: "", dayOfWeek: "MONDAY", startTime: "08:00", endTime: "17:00", toleranceMinutes: "10" });
+    setScheduleOpen(true);
+  }
+
+  function openScheduleEdit(s: any) {
+    setScheduleForm({
+      id: s.id,
+      dayOfWeek: s.dayOfWeek,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      toleranceMinutes: String(s.toleranceMinutes),
+    });
+    setScheduleOpen(true);
+  }
+
+  const scheduleFormValid =
+    /^([0-1]\d|2[0-3]):([0-5]\d)$/.test(scheduleForm.startTime) &&
+    /^([0-1]\d|2[0-3]):([0-5]\d)$/.test(scheduleForm.endTime) &&
+    scheduleForm.startTime < scheduleForm.endTime;
+
+  async function handleScheduleSubmit() {
+    setScheduleSaving(true);
+    try {
+      const payload = {
+        dayOfWeek: scheduleForm.dayOfWeek,
+        startTime: scheduleForm.startTime,
+        endTime: scheduleForm.endTime,
+        toleranceMinutes: Number(scheduleForm.toleranceMinutes) || 0,
+      };
+      if (scheduleForm.id) {
+        await api.schedules.update(scheduleForm.id, payload);
+        toast("Horaire modifié avec succès.", "success");
+      } else {
+        await api.workers.assignSchedule(id, payload);
+        toast("Horaire enregistré avec succès.", "success");
+      }
+      setScheduleOpen(false);
+      load();
+    } catch (err: any) {
+      toast(err?.response?.data?.message ?? "Erreur.", "error");
+    } finally { setScheduleSaving(false); }
+  }
+
+  async function handleScheduleDelete(scheduleId: string) {
+    setScheduleDeleting(scheduleId);
+    try {
+      await api.schedules.remove(scheduleId);
+      toast("Horaire supprimé.", "success");
+      load();
+    } catch (err: any) {
+      toast(err?.response?.data?.message ?? "Erreur.", "error");
+    } finally { setScheduleDeleting(null); }
   }
 
   async function handleToggle() {
@@ -180,7 +243,14 @@ export default function WorkerDetailPage() {
       {/* Data tables */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>Horaires</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Horaires</CardTitle>
+            {canManageSchedules() && (
+              <Button variant="outline" size="sm" onClick={openScheduleCreate}>
+                <Plus className="h-3.5 w-3.5" /> Ajouter
+              </Button>
+            )}
+          </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
@@ -189,21 +259,41 @@ export default function WorkerDetailPage() {
                   <TableHead>Début</TableHead>
                   <TableHead>Fin</TableHead>
                   <TableHead>Tolérance</TableHead>
+                  {canManageSchedules() && <TableHead className="w-24">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {worker.schedules?.length ? (
                   worker.schedules.map((s: any) => (
                     <TableRow key={s.id}>
-                      <TableCell>{s.dayOfWeek}</TableCell>
+                      <TableCell>{DAY_LABELS[s.dayOfWeek] ?? s.dayOfWeek}</TableCell>
                       <TableCell>{s.startTime}</TableCell>
                       <TableCell>{s.endTime}</TableCell>
                       <TableCell>{s.toleranceMinutes} min</TableCell>
+                      {canManageSchedules() && (
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openScheduleEdit(s)} title="Modifier">
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive"
+                              disabled={scheduleDeleting === s.id}
+                              onClick={() => handleScheduleDelete(s.id)}
+                              title="Supprimer"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">Aucun horaire configuré.</TableCell>
+                    <TableCell colSpan={canManageSchedules() ? 5 : 4} className="text-center text-muted-foreground">Aucun horaire configuré.</TableCell>
                   </TableRow>
                 )}
               </TableBody>
@@ -218,7 +308,8 @@ export default function WorkerDetailPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Heure</TableHead>
+                  <TableHead>Arrivée</TableHead>
+                  <TableHead>Sortie</TableHead>
                   <TableHead>Retard</TableHead>
                   <TableHead>Statut</TableHead>
                 </TableRow>
@@ -229,6 +320,7 @@ export default function WorkerDetailPage() {
                     <TableRow key={a.id}>
                       <TableCell>{formatDate(a.attendanceDate)}</TableCell>
                       <TableCell>{formatTime(a.checkInTime)}</TableCell>
+                      <TableCell>{a.checkOutTime ? formatTime(a.checkOutTime) : "—"}</TableCell>
                       <TableCell>{a.latenessMinutes > 0 ? `${a.latenessMinutes} min` : "—"}</TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                     </TableRow>
@@ -312,6 +404,37 @@ export default function WorkerDetailPage() {
         </div>
       </Modal>
 
+      {/* Schedule modal (create or edit) */}
+      <Modal open={scheduleOpen} onClose={() => setScheduleOpen(false)} title={scheduleForm.id ? "Modifier l'horaire" : "Ajouter un horaire"} className="max-w-md">
+        <div className="space-y-4">
+          <div className="space-y-1.5"><Label>Jour *</Label>
+            <Select value={scheduleForm.dayOfWeek} disabled={!!scheduleForm.id} onChange={(e) => setScheduleForm({ ...scheduleForm, dayOfWeek: e.target.value })}>
+              {DAY_OPTIONS.map((d) => <option key={d} value={d}>{DAY_LABELS[d]}</option>)}
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label>Heure d'arrivée *</Label>
+              <Input type="time" value={scheduleForm.startTime} onChange={(e) => setScheduleForm({ ...scheduleForm, startTime: e.target.value })} />
+            </div>
+            <div className="space-y-1.5"><Label>Heure de départ *</Label>
+              <Input type="time" value={scheduleForm.endTime} onChange={(e) => setScheduleForm({ ...scheduleForm, endTime: e.target.value })} />
+            </div>
+          </div>
+          <div className="space-y-1.5"><Label>Tolérance (minutes)</Label>
+            <Input type="number" min={0} value={scheduleForm.toleranceMinutes} onChange={(e) => setScheduleForm({ ...scheduleForm, toleranceMinutes: e.target.value })} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Le retard retenu est le retard réel moins la tolérance. Un pointage au-delà génère une pénalité selon les règles configurées.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setScheduleOpen(false)}>Annuler</Button>
+            <Button onClick={handleScheduleSubmit} disabled={scheduleSaving || !scheduleFormValid}>
+              {scheduleSaving ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Toggle confirm */}
       <ConfirmDialog
         open={toggleOpen}
@@ -326,6 +449,18 @@ export default function WorkerDetailPage() {
     </AppShell>
   );
 }
+
+const DAY_OPTIONS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
+
+const DAY_LABELS: Record<string, string> = {
+  MONDAY: "Lundi",
+  TUESDAY: "Mardi",
+  WEDNESDAY: "Mercredi",
+  THURSDAY: "Jeudi",
+  FRIDAY: "Vendredi",
+  SATURDAY: "Samedi",
+  SUNDAY: "Dimanche",
+};
 
 function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (

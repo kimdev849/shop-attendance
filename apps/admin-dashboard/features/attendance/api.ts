@@ -12,6 +12,7 @@ export interface Attendance {
   attendanceDate: string;
   scheduledTime: string | null;
   checkInTime: string;
+  checkOutTime: string | null;
   latenessMinutes: number;
   status: string;
   /** URL Cloudinary de la photo de pointage (audit, expire sous 28 jours) — null si absente/expirée. */

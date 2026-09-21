@@ -46,6 +46,7 @@ export class ReportsService {
       Shop: row.shop?.name,
       "Heure prévue": row.scheduledTime,
       "Heure réelle": row.checkInTime,
+      Sortie: row.checkOutTime ?? "",
       Retard: row.latenessMinutes > 0 ? `${row.latenessMinutes} min` : "",
       Statut: row.status,
       Pénalité: row.penalty?.amount ?? "",

@@ -127,6 +127,7 @@ export default function AttendancePage() {
                     <TableHead>Shop</TableHead>
                     <TableHead>Heure prévue</TableHead>
                     <SortableHead label="Heure réelle" field="checkInTime" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
+                    <TableHead>Sortie</TableHead>
                     <SortableHead label="Retard" field="latenessMinutes" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
                     <SortableHead label="Statut" field="status" currentSort={sortBy} currentOrder={sortOrder} onSort={handleSort} />
                     <TableHead>Photo</TableHead>
@@ -141,6 +142,7 @@ export default function AttendancePage() {
                       <TableCell>{a.shop.name}</TableCell>
                       <TableCell>{a.scheduledTime ? formatTime(a.scheduledTime) : "—"}</TableCell>
                       <TableCell>{formatTime(a.checkInTime)}</TableCell>
+                      <TableCell>{a.checkOutTime ? formatTime(a.checkOutTime) : "—"}</TableCell>
                       <TableCell>{a.latenessMinutes > 0 ? `${a.latenessMinutes} min` : "—"}</TableCell>
                       <TableCell><StatusBadge status={a.status} /></TableCell>
                       <TableCell>

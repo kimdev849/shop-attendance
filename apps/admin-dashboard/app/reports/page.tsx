@@ -132,6 +132,7 @@ function ReportTable({ type, rows }: { type: ReportType; rows: any[] }) {
             <TableHead>Shop</TableHead>
             <TableHead>Heure prévue</TableHead>
             <TableHead>Heure réelle</TableHead>
+            <TableHead>Sortie</TableHead>
             <TableHead>Retard</TableHead>
             <TableHead>Statut</TableHead>
             <TableHead>Pénalité</TableHead>
@@ -146,6 +147,7 @@ function ReportTable({ type, rows }: { type: ReportType; rows: any[] }) {
               <TableCell>{r.shop?.name ?? "—"}</TableCell>
               <TableCell>{r.scheduledTime ? formatTime(r.scheduledTime) : "—"}</TableCell>
               <TableCell>{formatTime(r.checkInTime)}</TableCell>
+              <TableCell>{r.checkOutTime ? formatTime(r.checkOutTime) : "—"}</TableCell>
               <TableCell>{r.latenessMinutes > 0 ? `${r.latenessMinutes} min` : "—"}</TableCell>
               <TableCell><StatusBadge status={r.status} /></TableCell>
               <TableCell>{r.penalty ? formatFcfa(r.penalty.amount) : "—"}</TableCell>
