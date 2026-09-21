@@ -127,8 +127,11 @@ export default function SettingsScreen() {
       const device = await findExistingDevice(deviceName.trim(), selectedShop.id);
       const config: DeviceConfig = {
         apiUrl: process.env.EXPO_PUBLIC_API_URL ?? "https://shop-attendance-api.onrender.com",
+        // ⚠️ device.id = UUID (clé primaire attendue par l'API), PAS device.deviceIdentifier
+        // (ex: "TAB-XYZ") — l'ancien code stockait l'identifiant matériel et l'API
+        // rejetait chaque pointage avec "Tablette introuvable".
         shopId: selectedShop.id,
-        deviceId: device.deviceIdentifier,
+        deviceId: device.id,
         deviceName: deviceName.trim(),
         shopName: selectedShop.name,
       };

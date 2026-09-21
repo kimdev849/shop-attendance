@@ -35,6 +35,7 @@ export class SyncService {
           clientTimestamp: item.clientTimestamp,
           clientRequestId: item.clientRequestId,
           biometricConfirmed: item.biometricConfirmed,
+          type: item.type,
           checkInPhoto: item.checkInPhoto,
         });
 
@@ -51,7 +52,9 @@ export class SyncService {
             status: "DUPLICATE",
           });
         } else {
-          this.logger.error(`Sync failed for ${item.clientRequestId}: ${error.message}`);
+          this.logger.error(
+            `Sync failed for ${item.clientRequestId} (deviceId=${item.deviceId}): ${error.message}`,
+          );
           results.push({
             clientRequestId: item.clientRequestId,
             status: "ERROR",
@@ -60,6 +63,11 @@ export class SyncService {
         }
       }
     }
+
+    const created = results.filter((r) => r.status === "CREATED").length;
+    const duplicates = results.filter((r) => r.status === "DUPLICATE").length;
+    const errors = results.filter((r) => r.status === "ERROR").length;
+    this.logger.log(`Sync batch: ${created} créé(s), ${duplicates} doublon(s), ${errors} erreur(s)`);
 
     return results;
   }

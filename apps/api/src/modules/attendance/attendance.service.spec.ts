@@ -1,9 +1,10 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { AttendanceService } from "./attendance.service";
+import { AttendanceRepository } from "./attendance.repository";
 
 describe("AttendanceService", () => {
   let service: AttendanceService;
-  let prisma: any;
+  let repository: any;
   let auditService: any;
   let devicesService: any;
   let schedulesService: any;
@@ -24,12 +25,16 @@ describe("AttendanceService", () => {
   };
 
   beforeEach(() => {
-    prisma = {
-      attendance: { findUnique: jest.fn(), create: jest.fn() },
-      worker: { findUnique: jest.fn() },
-      shop: { findUnique: jest.fn() },
-      device: { findUnique: jest.fn() },
-      penalty: { create: jest.fn() },
+    repository = {
+      findByClientRequestId: jest.fn().mockResolvedValue(null),
+      findByWorkerAndDate: jest.fn().mockResolvedValue(null),
+      findWorkerById: jest.fn(),
+      findShopById: jest.fn(),
+      findDeviceByIdOrIdentifier: jest.fn(),
+      create: jest.fn(),
+      createPenalty: jest.fn(),
+      updateCheckOut: jest.fn(),
+      updateCheckInPhoto: jest.fn(),
     };
     auditService = { log: jest.fn() };
     devicesService = { touch: jest.fn().mockResolvedValue({}) };
@@ -37,7 +42,7 @@ describe("AttendanceService", () => {
     penaltyCalculator = { computeLateness: jest.fn(), computePenaltyAmount: jest.fn() };
 
     service = new AttendanceService(
-      prisma,
+      repository,
       auditService,
       devicesService,
       schedulesService,
@@ -47,10 +52,9 @@ describe("AttendanceService", () => {
   });
 
   it("rejette le pointage sans confirmation biométrique", async () => {
-    prisma.attendance.findUnique.mockResolvedValue(null);
-    prisma.worker.findUnique.mockResolvedValue(worker);
-    prisma.shop.findUnique.mockResolvedValue(shop);
-    prisma.device.findUnique.mockResolvedValue(device);
+    repository.findWorkerById.mockResolvedValue(worker);
+    repository.findShopById.mockResolvedValue(shop);
+    repository.findDeviceByIdOrIdentifier.mockResolvedValue(device);
 
     await expect(
       service.checkIn({ ...baseDto, biometricConfirmed: false }),
@@ -58,25 +62,42 @@ describe("AttendanceService", () => {
   });
 
   it("rejette le pointage pour un travailleur introuvable", async () => {
-    prisma.attendance.findUnique.mockResolvedValue(null);
-    prisma.worker.findUnique.mockResolvedValue(null);
+    repository.findWorkerById.mockResolvedValue(null);
 
     await expect(service.checkIn(baseDto)).rejects.toThrow(NotFoundException);
   });
 
+  it("rejette le pointage pour une tablette introuvable (deviceId inconnu)", async () => {
+    repository.findWorkerById.mockResolvedValue(worker);
+    repository.findShopById.mockResolvedValue(shop);
+    repository.findDeviceByIdOrIdentifier.mockResolvedValue(null);
+
+    await expect(service.checkIn(baseDto)).rejects.toThrow(NotFoundException);
+  });
+
+  it("résout la tablette via deviceIdentifier (fallback compat tablettes déjà appairées)", async () => {
+    repository.findWorkerById.mockResolvedValue(worker);
+    repository.findShopById.mockResolvedValue(shop);
+    // La config locale des anciennes tablettes stocke deviceIdentifier, pas l'UUID
+    repository.findDeviceByIdOrIdentifier.mockResolvedValue(device);
+    // biometricConfirmed:false → échoue juste APRÈS la résolution du device
+    const legacyDto = { ...baseDto, deviceId: "TAB-LEGACY", biometricConfirmed: false };
+
+    await expect(service.checkIn(legacyDto)).rejects.toThrow(BadRequestException);
+    expect(repository.findDeviceByIdOrIdentifier).toHaveBeenCalledWith("TAB-LEGACY");
+  });
+
   it("enregistre un pointage À L'HEURE sans pénalité (arrivée dans la tolérance)", async () => {
-    prisma.attendance.findUnique.mockResolvedValueOnce(null); // idempotency check
-    prisma.worker.findUnique.mockResolvedValue(worker);
-    prisma.shop.findUnique.mockResolvedValue(shop);
-    prisma.device.findUnique.mockResolvedValue(device);
-    prisma.attendance.findUnique.mockResolvedValueOnce(null); // duplicate-for-day check
+    repository.findWorkerById.mockResolvedValue(worker);
+    repository.findShopById.mockResolvedValue(shop);
+    repository.findDeviceByIdOrIdentifier.mockResolvedValue(device);
     schedulesService.findApplicableSchedule.mockResolvedValue(schedule);
     penaltyCalculator.computeLateness.mockReturnValue({
       rawLatenessMinutes: 7,
       retainedLatenessMinutes: 0,
       isLate: false,
     });
-    prisma.attendance.create.mockResolvedValue({
+    repository.create.mockResolvedValue({
       id: "a1",
       worker: { firstName: "Jean", lastName: "Dupont" },
       checkInTime: new Date(baseDto.clientTimestamp),
@@ -90,17 +111,15 @@ describe("AttendanceService", () => {
     expect(result.status).toBe("ON_TIME");
     expect(result.latenessMinutes).toBe(0);
     expect(result.penaltyAmount).toBeNull();
-    expect(prisma.penalty.create).not.toHaveBeenCalled();
+    expect(repository.createPenalty).not.toHaveBeenCalled();
     expect(devicesService.touch).toHaveBeenCalledWith("d1");
   });
 
   it("enregistre un pointage EN RETARD et crée une pénalité PENDING", async () => {
     const lateDto = { ...baseDto, clientTimestamp: "2026-08-25T08:25:00.000Z" };
-    prisma.attendance.findUnique.mockResolvedValueOnce(null);
-    prisma.worker.findUnique.mockResolvedValue(worker);
-    prisma.shop.findUnique.mockResolvedValue(shop);
-    prisma.device.findUnique.mockResolvedValue(device);
-    prisma.attendance.findUnique.mockResolvedValueOnce(null);
+    repository.findWorkerById.mockResolvedValue(worker);
+    repository.findShopById.mockResolvedValue(shop);
+    repository.findDeviceByIdOrIdentifier.mockResolvedValue(device);
     schedulesService.findApplicableSchedule.mockResolvedValue(schedule);
     penaltyCalculator.computeLateness.mockReturnValue({
       rawLatenessMinutes: 25,
@@ -108,7 +127,7 @@ describe("AttendanceService", () => {
       isLate: true,
     });
     penaltyCalculator.computePenaltyAmount.mockResolvedValue(1000);
-    prisma.attendance.create.mockResolvedValue({
+    repository.create.mockResolvedValue({
       id: "a2",
       worker: { firstName: "Jean", lastName: "Dupont" },
       checkInTime: new Date(lateDto.clientTimestamp),
@@ -116,7 +135,7 @@ describe("AttendanceService", () => {
       latenessMinutes: 15,
       status: "LATE",
     });
-    prisma.penalty.create.mockResolvedValue({ amount: 1000, status: "PENDING" });
+    repository.createPenalty.mockResolvedValue({ amount: 1000, status: "PENDING" });
 
     const result = await service.checkIn(lateDto);
 
@@ -124,9 +143,10 @@ describe("AttendanceService", () => {
     expect(result.latenessMinutes).toBe(15);
     expect(result.penaltyAmount).toBe(1000);
     expect(result.penaltyStatus).toBe("PENDING");
-    expect(prisma.penalty.create).toHaveBeenCalledWith(
+    expect(repository.createPenalty).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ amount: 1000, status: "PENDING" }),
+        amount: 1000,
+        status: "PENDING",
       }),
     );
   });
@@ -141,13 +161,13 @@ describe("AttendanceService", () => {
       status: "ON_TIME",
       penalty: null,
     };
-    prisma.attendance.findUnique.mockResolvedValueOnce(existing);
+    repository.findByClientRequestId.mockResolvedValueOnce(existing);
 
     const result = await service.checkIn(baseDto);
 
     expect(result.attendanceId).toBe("a1");
-    expect(prisma.worker.findUnique).not.toHaveBeenCalled();
-    expect(prisma.attendance.create).not.toHaveBeenCalled();
+    expect(repository.findWorkerById).not.toHaveBeenCalled();
+    expect(repository.create).not.toHaveBeenCalled();
   });
 
   it("protection contre les doublons: un second pointage le même jour renvoie le pointage existant", async () => {
@@ -160,16 +180,14 @@ describe("AttendanceService", () => {
       status: "ON_TIME",
       penalty: null,
     };
-    prisma.attendance.findUnique
-      .mockResolvedValueOnce(null) // idempotency check (new clientRequestId)
-      .mockResolvedValueOnce(existingForDay); // same-day check finds an existing record
-    prisma.worker.findUnique.mockResolvedValue(worker);
-    prisma.shop.findUnique.mockResolvedValue(shop);
-    prisma.device.findUnique.mockResolvedValue(device);
+    repository.findByWorkerAndDate.mockResolvedValueOnce(existingForDay);
+    repository.findWorkerById.mockResolvedValue(worker);
+    repository.findShopById.mockResolvedValue(shop);
+    repository.findDeviceByIdOrIdentifier.mockResolvedValue(device);
 
-    const result = await service.checkIn({ ...baseDto, clientRequestId: "req-2" });
+    const result = await service.checkIn({ ...baseDto, clientRequestId: "req-2", type: "CHECK_IN" });
 
     expect(result.attendanceId).toBe("a1");
-    expect(prisma.attendance.create).not.toHaveBeenCalled();
+    expect(repository.create).not.toHaveBeenCalled();
   });
 });

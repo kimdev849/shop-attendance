@@ -110,6 +110,23 @@ export class AttendanceRepository {
     return this.prisma.device.findUnique({ where: { id } });
   }
 
+  /**
+   * Résout une tablette par son UUID (clé primaire) OU son identifiant matériel
+   * (deviceIdentifier, ex: "TAB-XYZ"). Compatibilité avec les tablettes déjà
+   * appairées qui stockent deviceIdentifier comme deviceId dans leur config
+   * locale — sans ce fallback, chaque pointage rejoué échouait en
+   * "Tablette introuvable" et restait bloqué dans la file de sync.
+   */
+  async findDeviceByIdOrIdentifier(idOrIdentifier: string) {
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrIdentifier);
+    if (isUuid) {
+      const byId = await this.prisma.device.findUnique({ where: { id: idOrIdentifier } });
+      if (byId) return byId;
+    }
+    return this.prisma.device.findUnique({ where: { deviceIdentifier: idOrIdentifier } });
+  }
+
   async createPenalty(data: {
     workerId: string;
     attendanceId: string;

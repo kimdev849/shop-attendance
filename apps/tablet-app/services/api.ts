@@ -8,6 +8,20 @@ const TIMEOUT_MS = 75_000; // 75s (= jusqu'à ~60s de cold start + marge de trai
 const MAX_RETRIES = 2;
 
 /**
+ * Erreur renvoyée quand le serveur a RÉPONDU (4xx/5xx). Permet à l'appelant de
+ * distinguer une erreur métier/validation (inutile de retenter : l'item
+ * échouerait à chaque sync) d'une vraie panne réseau (à mettre en file offline).
+ */
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+/**
  * Vérifie que le service API répond réellement, en laissant le temps au
  * cold start Render de se terminer (jusqu'à 60 s). Sert de sonde avant un
  * envoi important (ex: pointage avec photo d'audit) pour éviter les faux
@@ -86,7 +100,7 @@ export async function submitCheckIn(payload: CheckInPayload): Promise<CheckInRes
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(body.message ?? `Erreur serveur (${response.status})`);
+    throw new ApiError(response.status, body.message ?? `Erreur serveur (${response.status})`);
   }
 
   return safeJson(response);
@@ -94,7 +108,7 @@ export async function submitCheckIn(payload: CheckInPayload): Promise<CheckInRes
 
 export async function syncAttendanceBatch(
   items: CheckInPayload[],
-): Promise<{ total: number; succeeded: number; failed: number; results: SyncAttendanceResult[] }> {
+): Promise<SyncAttendanceResult[] | { results: SyncAttendanceResult[] }> {
   const response = await fetchWithTimeout(`${API_URL}/v1/sync/attendance`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -106,6 +120,7 @@ export async function syncAttendanceBatch(
     throw new Error(body.message ?? `Erreur serveur (${response.status})`);
   }
 
+  // L'API renvoie un tableau nu de résultats (un par item).
   return safeJson(response);
 }
 

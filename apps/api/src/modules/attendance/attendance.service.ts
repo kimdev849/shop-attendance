@@ -72,8 +72,8 @@ export class AttendanceService {
       throw new BadRequestException("Ce travailleur n'est pas affecté à ce shop.");
     }
 
-    // 3. Vérifier le device
-    const device = await this.repository.findDeviceById(dto.deviceId);
+    // 3. Vérifier le device (UUID ou identifiant matériel — voir repository)
+    const device = await this.repository.findDeviceByIdOrIdentifier(dto.deviceId);
     if (!device) throw new NotFoundException("Tablette introuvable.");
     if (device.shopId !== shop.id) {
       throw new BadRequestException("Cette tablette n'est pas rattachée à ce shop.");
@@ -103,11 +103,15 @@ export class AttendanceService {
       }
       if (existingForDay.checkOutTime) {
         // Déjà pointé sortie — retourner l'existant
-        return this.toResult(existingForDay, existingForDay.penalty, 'CHECK_OUT');
+        const existing = this.toResult(existingForDay, existingForDay.penalty, 'CHECK_OUT');
+        existing.type = 'CHECK_OUT';
+        return existing;
       }
 
       // Mettre à jour avec l'heure de sortie
       const updated = await this.repository.updateCheckOut(existingForDay.id, clientTime);
+      // Propager le type de pointage au résultat (l'enregistrement ne le stocke pas)
+      (updated as any).resolvedType = 'CHECK_OUT';
 
       // Audit photo (optionnel, jamais bloquant) si une photo est fournie
       if (dto.checkInPhoto) {
@@ -319,7 +323,8 @@ export class AttendanceService {
       status: attendance.status,
       penaltyAmount: penalty?.amount ?? null,
       penaltyStatus: penalty?.status ?? null,
-      type,
+      // Type explicitement résolu si présent, sinon déduit de checkOutTime
+      type: (attendance as any).resolvedType ?? type,
     };
   }
 }

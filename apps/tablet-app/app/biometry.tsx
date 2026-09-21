@@ -18,7 +18,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { PrimaryButton } from "../components/primary-button";
 import { theme } from "../components/theme";
-import { submitCheckIn, getFacePhotoForCheckIn, waitForServerReady } from "../services/api";
+import { submitCheckIn, getFacePhotoForCheckIn, waitForServerReady, ApiError } from "../services/api";
 import { isOnline } from "../services/network";
 import { getDeviceConfig } from "../storage/device-config";
 import { enqueueAttendance } from "../storage/attendance-queue";
@@ -150,26 +150,34 @@ export default function BiometryScreen() {
       setStep("success");
       setTimeout(() => router.replace("/confirmation"), 1200);
     } catch (err: any) {
-      try {
-        const config = await getDeviceConfig();
-        if (config && worker) {
-          const payload = {
-            workerId: worker.id, shopId: config.shopId, deviceId: config.deviceId,
-            clientTimestamp: new Date().toISOString(), clientRequestId: generateId(),
-            biometricConfirmed: true, type: attendanceType, queuedAt: new Date().toISOString(),
-          };
-          await enqueueAttendance(payload);
-          setResult({
-            attendanceId: "queued", workerFullName: `${worker.firstName} ${worker.lastName}`,
-            checkInTime: payload.clientTimestamp, checkOutTime: null, scheduledTime: null,
-            latenessMinutes: 0, status: "ON_TIME" as any,
-            penaltyAmount: null, penaltyStatus: null, type: attendanceType, queuedOffline: true,
-          });
-          setStep("success");
-          setTimeout(() => router.replace("/confirmation"), 1200);
-          return;
-        }
-      } catch {}
+      // ⚠️ Seule une VRAIE panne réseau justifie la file offline. Une erreur
+      // serveur (4xx/5xx : travailleur inactif, tablette inconnue, etc.)
+      // échouerait à CHAQUE synchronisation et polluerait la file pour rien —
+      // on l'affiche à l'utilisateur à la place du faux succès
+      // "Sera synchronisé dès la reconnexion".
+      const isNetworkFailure = !(err instanceof ApiError);
+      if (isNetworkFailure) {
+        try {
+          const config = await getDeviceConfig();
+          if (config && worker) {
+            const payload = {
+              workerId: worker.id, shopId: config.shopId, deviceId: config.deviceId,
+              clientTimestamp: new Date().toISOString(), clientRequestId: generateId(),
+              biometricConfirmed: true, type: attendanceType, queuedAt: new Date().toISOString(),
+            };
+            await enqueueAttendance(payload);
+            setResult({
+              attendanceId: "queued", workerFullName: `${worker.firstName} ${worker.lastName}`,
+              checkInTime: payload.clientTimestamp, checkOutTime: null, scheduledTime: null,
+              latenessMinutes: 0, status: "ON_TIME" as any,
+              penaltyAmount: null, penaltyStatus: null, type: attendanceType, queuedOffline: true,
+            });
+            setStep("success");
+            setTimeout(() => router.replace("/confirmation"), 1200);
+            return;
+          }
+        } catch {}
+      }
       setStep("submit_error");
       setMessage(err?.message ?? "Erreur lors du pointage.");
     }
