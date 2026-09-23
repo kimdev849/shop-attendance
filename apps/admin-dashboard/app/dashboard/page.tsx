@@ -26,13 +26,13 @@ function StatCard({ icon: Icon, label, value, accent, href }: {
   icon: any; label: string; value: string | number; accent: string; href?: string;
 }) {
   const content = (
-    <Card className="group transition-all duration-200 hover:shadow-md hover:border-primary/20">
+    <Card className="group transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/5">
       <CardContent className="flex items-center justify-between p-4">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
           <p className="mt-1 text-xl font-bold tabular-nums tracking-tight text-foreground sm:text-2xl">{value}</p>
         </div>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-110 sm:h-11 sm:w-11"
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm transition-transform duration-200 group-hover:scale-110 group-hover:rotate-3 sm:h-11 sm:w-11"
           style={{ backgroundColor: `hsl(${accent} / 0.1)` }}>
           <Icon className="h-5 w-5" style={{ color: `hsl(${accent})` }} />
         </div>

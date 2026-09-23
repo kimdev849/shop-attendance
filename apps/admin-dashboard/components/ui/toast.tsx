@@ -35,7 +35,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             className={cn(
-              "flex items-center gap-2 rounded-md border border-border bg-card px-4 py-3 text-sm shadow-lg",
+              "animate-rise flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm shadow-lg shadow-black/10",
               t.variant === "success" && "border-success/30",
               t.variant === "error" && "border-destructive/30",
             )}

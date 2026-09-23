@@ -28,10 +28,10 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
       <div
         className={cn(
-          "w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl",
+          "animate-rise w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-2xl shadow-black/10",
           className,
         )}
       >

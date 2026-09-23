@@ -24,7 +24,7 @@
   --warning-foreground: 0 0% 100%;
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 100%;
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 }
 
 .dark {
@@ -92,5 +92,7 @@ main { scroll-behavior: smooth; }
 /* Animation */
 @keyframes slideIn { from { opacity: 0; transform: translateX(-100%); } to { opacity: 1; transform: translateX(0); } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rise { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .animate-slide-in { animation: slideIn 0.2s ease-out; }
 .animate-fade-in { animation: fadeIn 0.15s ease-out; }
+.animate-rise { animation: rise 0.22s ease-out both; }
