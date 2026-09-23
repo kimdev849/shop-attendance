@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Users as UsersIcon, RotateCcw, Fingerprint, Camera, ScanFace } from "lucide-react";
+import { Plus, Search, Users as UsersIcon, RotateCcw, Fingerprint, Camera, ScanFace, X } from "lucide-react";
 import { AppShell } from "@/components/layout/shell";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,29 @@ interface PaginatedResult {
 
 const EMPTY_FORM = { employeeNumber: "", firstName: "", lastName: "", position: "", phone: "", email: "", shopId: "" };
 
+const DAY_OPTIONS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
+
+const DAY_LABELS: Record<string, string> = {
+  MONDAY: "Lundi",
+  TUESDAY: "Mardi",
+  WEDNESDAY: "Mercredi",
+  THURSDAY: "Jeudi",
+  FRIDAY: "Vendredi",
+  SATURDAY: "Samedi",
+  SUNDAY: "Dimanche",
+};
+
+interface ScheduleRow {
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  toleranceMinutes: string;
+}
+
+const EMPTY_SCHEDULE_ROW: ScheduleRow = { dayOfWeek: "MONDAY", startTime: "08:00", endTime: "17:00", toleranceMinutes: "10" };
+
+const TIME_PATTERN = /^([0-1]\d|2[0-3]):([0-5]\d)$/;
+
 export default function WorkersPage() {
   const router = useRouter();
   const [result, setResult] = useState<PaginatedResult | null>(null);
@@ -66,6 +89,7 @@ export default function WorkersPage() {
   const [deactivateTarget, setDeactivateTarget] = useState<Worker | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [createSchedules, setCreateSchedules] = useState<ScheduleRow[]>([]);
   const [editId, setEditId] = useState("");
   const [pinTarget, setPinTarget] = useState<Worker | null>(null);
   const [pinValue, setPinValue] = useState("");
@@ -110,9 +134,38 @@ export default function WorkersPage() {
 
   async function handleCreate() {
     setSaving(true);
-    try { await api.workers.create(form); toast("Travailleur créé.", "success"); setCreateOpen(false); setForm(EMPTY_FORM); load(); }
-    catch (err: any) { toast(err?.response?.data?.message ?? "Erreur.", "error"); }
-    finally { setSaving(false); }
+    try {
+      // 1) Création du travailleur.
+      const { data: worker } = await api.workers.create(form);
+      // 2) Horaires saisis dans le formulaire : envoyés un par un via l'endpoint
+      // existant POST /workers/:id/schedules (upsert par jour). La création
+      // du travailleur n'est pas annulée si un horaire échoue.
+      let scheduleError: string | null = null;
+      for (const s of createSchedules) {
+        try {
+          await api.workers.assignSchedule(worker.id, {
+            dayOfWeek: s.dayOfWeek,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            toleranceMinutes: Number(s.toleranceMinutes) || 0,
+          });
+        } catch (err: any) {
+          scheduleError = err?.response?.data?.message ?? "Erreur.";
+          break;
+        }
+      }
+      if (scheduleError) {
+        toast(`Travailleur créé, mais l'enregistrement d'un horaire a échoué : ${scheduleError} Vous pouvez les définir sur sa fiche.`, "error");
+      } else {
+        toast("Travailleur créé.", "success");
+      }
+      setCreateOpen(false);
+      setForm(EMPTY_FORM);
+      setCreateSchedules([]);
+      load();
+    } catch (err: any) {
+      toast(err?.response?.data?.message ?? "Erreur.", "error");
+    } finally { setSaving(false); }
   }
 
   function openEdit(w: Worker) {
@@ -265,7 +318,7 @@ export default function WorkersPage() {
             </Button>
           )}
         </div>
-        <Button onClick={() => { setForm(EMPTY_FORM); setCreateOpen(true); }}>
+        <Button onClick={() => { setForm(EMPTY_FORM); setCreateSchedules([]); setCreateOpen(true); }}>
           <Plus className="h-4 w-4" /> Nouveau
         </Button>
       </div>
@@ -318,7 +371,7 @@ export default function WorkersPage() {
                             onDeactivate={w.status === "ACTIVE" ? () => setDeactivateTarget(w) : undefined}
                             onActivate={w.status !== "ACTIVE" ? () => setDeactivateTarget(w) : undefined}
                           />
-                          <button onClick={() => { setPinTarget(w); setPinValue(""); }} title="MDP"
+                          <button onClick={() => { setPinTarget(w); setPinValue(""); }} title="Mot de passe"
                             className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground">
                             <Fingerprint className="h-4 w-4" />
                           </button>
@@ -340,7 +393,7 @@ export default function WorkersPage() {
 
       {/* Create modal */}
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Créer un travailleur">
-        <WorkerForm form={form} setForm={setForm} shops={shops} onSubmit={handleCreate} onCancel={() => setCreateOpen(false)} saving={saving} submitLabel="Créer" />
+        <WorkerForm form={form} setForm={setForm} shops={shops} schedules={createSchedules} setSchedules={setCreateSchedules} onSubmit={handleCreate} onCancel={() => setCreateOpen(false)} saving={saving} submitLabel="Créer" />
       </Modal>
 
       {/* Edit modal */}
@@ -469,10 +522,16 @@ export default function WorkersPage() {
   );
 }
 
-function WorkerForm({ form, setForm, shops, onSubmit, onCancel, saving, submitLabel }: {
+function WorkerForm({ form, setForm, shops, schedules, setSchedules, onSubmit, onCancel, saving, submitLabel }: {
   form: typeof EMPTY_FORM; setForm: (f: typeof EMPTY_FORM) => void; shops: { id: string; name: string }[];
+  schedules?: ScheduleRow[]; setSchedules?: (s: ScheduleRow[]) => void;
   onSubmit: () => void; onCancel: () => void; saving: boolean; submitLabel: string;
 }) {
+  function updateScheduleRow(index: number, patch: Partial<ScheduleRow>) {
+    if (!schedules || !setSchedules) return;
+    setSchedules(schedules.map((s, i) => (i === index ? { ...s, ...patch } : s)));
+  }
+
   return (
     <div className="space-y-4">
       <div className="space-y-1.5"><Label>Matricule *</Label><Input value={form.employeeNumber} onChange={(e) => setForm({ ...form, employeeNumber: e.target.value })} /></div>
@@ -491,6 +550,73 @@ function WorkerForm({ form, setForm, shops, onSubmit, onCancel, saving, submitLa
           {shops.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </Select>
       </div>
+
+      {/* Section Horaires — facultative à la création, modifiable ensuite depuis la fiche du travailleur */}
+      {schedules && setSchedules && (
+        <div className="space-y-2 rounded-lg border border-border p-3">
+          <div className="flex items-center justify-between">
+            <Label>Horaires</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={schedules.length >= 7}
+              onClick={() => setSchedules([...schedules, { ...EMPTY_SCHEDULE_ROW }])}
+            >
+              <Plus className="h-3.5 w-3.5" /> Ajouter un jour
+            </Button>
+          </div>
+          {schedules.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Facultatif — définissez ici les jours et heures de travail prévus. Vous pourrez aussi les ajouter plus tard depuis sa fiche.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {schedules.map((s, i) => {
+                const timesValid = TIME_PATTERN.test(s.startTime) && TIME_PATTERN.test(s.endTime) && s.startTime < s.endTime;
+                return (
+                  <div key={i} className="space-y-2 rounded-md border border-border/60 p-2">
+                    <div className="flex items-center gap-2">
+                      <Select value={s.dayOfWeek} onChange={(e) => updateScheduleRow(i, { dayOfWeek: e.target.value })} className="flex-1">
+                        {DAY_OPTIONS.map((d) => <option key={d} value={d}>{DAY_LABELS[d]}</option>)}
+                      </Select>
+                      <button
+                        type="button"
+                        onClick={() => setSchedules(schedules.filter((_, j) => j !== i))}
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        title="Retirer ce jour"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Arrivée</Label>
+                        <Input type="time" value={s.startTime} onChange={(e) => updateScheduleRow(i, { startTime: e.target.value })} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Sortie</Label>
+                        <Input type="time" value={s.endTime} onChange={(e) => updateScheduleRow(i, { endTime: e.target.value })} />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Tolérance (min)</Label>
+                        <Input type="number" min={0} value={s.toleranceMinutes} onChange={(e) => updateScheduleRow(i, { toleranceMinutes: e.target.value })} />
+                      </div>
+                    </div>
+                    {!timesValid && (
+                      <p className="text-xs text-destructive">L'heure d'arrivée doit précéder l'heure de sortie.</p>
+                    )}
+                  </div>
+                );
+              })}
+              <p className="text-xs text-muted-foreground">
+                Un seul horaire par jour : ajouter un jour déjà présent mettra à jour l'horaire existant.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex justify-end gap-2 pt-2">
         <Button variant="outline" onClick={onCancel}>Annuler</Button>
         <Button onClick={onSubmit} disabled={saving || !form.employeeNumber || !form.firstName || !form.lastName}>

@@ -119,7 +119,7 @@ export default function DashboardPage() {
           {/* Stats — 2 cols on mobile, 3 on sm, 6 on lg */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 sm:gap-4">
             <StatCard icon={Store} label="Shops" value={stats.totalShops} accent="222 84% 40%" href="/shops" />
-            <StatCard icon={Users} label="Workers" value={stats.totalWorkers} accent="262 83% 58%" href="/workers" />
+            <StatCard icon={Users} label="Travailleurs" value={stats.totalWorkers} accent="262 83% 58%" href="/workers" />
             <StatCard icon={Tablet} label="Tablettes" value={stats.totalDevices} accent="200 90% 50%" href="/devices" />
             <StatCard icon={CheckCircle2} label="Présents" value={stats.presentToday} accent="152 69% 31%" href="/attendance" />
             <StatCard icon={Clock} label="Retards" value={stats.lateToday} accent="38 92% 50%" href="/attendance" />

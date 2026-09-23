@@ -44,6 +44,14 @@ const SidebarContext = createContext<SidebarContextValue>({
   setMobileOpen: () => {},
 });
 
+// Libellés français des rôles — la valeur brute (ADMIN, SHOP_MANAGER…)
+// reste utilisée dans le code et l'API, seule l'affichage est traduit.
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Administrateur",
+  SHOP_MANAGER: "Gérant de shop",
+  WORKER: "Travailleur",
+};
+
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
@@ -109,7 +117,7 @@ function DesktopSidebar() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-xs font-medium text-foreground">{user?.email ?? "—"}</p>
-            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{user?.role ?? ""}</p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{user?.role ? (ROLE_LABELS[user.role] ?? user.role) : ""}</p>
           </div>
           <button onClick={logout} title="Déconnexion" className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive">
             <LogOut className="h-4 w-4" />

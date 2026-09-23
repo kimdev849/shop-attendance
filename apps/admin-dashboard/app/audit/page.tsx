@@ -28,13 +28,36 @@ interface AuditLog {
 
 const ENTITY_OPTIONS = ["Worker", "Shop", "Attendance", "Absence", "Penalty", "Schedule", "Device", "User"];
 
+const DAY_LABELS: Record<string, string> = {
+  MONDAY: "Lundi",
+  TUESDAY: "Mardi",
+  WEDNESDAY: "Mercredi",
+  THURSDAY: "Jeudi",
+  FRIDAY: "Vendredi",
+  SATURDAY: "Samedi",
+  SUNDAY: "Dimanche",
+};
+
 const ACTION_LABELS: Record<string, string> = {
   WORKER_CREATED: "Travailleur créé",
   WORKER_UPDATED: "Travailleur modifié",
   WORKER_STATUS_ACTIVE: "Travailleur activé",
   WORKER_STATUS_INACTIVE: "Travailleur désactivé",
   WORKER_STATUS_SUSPENDED: "Travailleur suspendu",
+  WORKER_PIN_SET: "Mot de passe défini",
+  WORKER_PIN_RESET: "Mot de passe réinitialisé",
   WORKER_SCHEDULE_ASSIGNED: "Horaire affecté",
+  WORKER_FACE_SET: "Photo faciale définie",
+  WORKER_FACE_REMOVED: "Photo faciale supprimée",
+  DEVICE_CREATED: "Tablette créée",
+  DEVICE_UPDATED: "Tablette modifiée",
+  USER_CREATED: "Utilisateur créé",
+  USER_UPDATED: "Utilisateur modifié",
+  USER_STATUS_ACTIVE: "Utilisateur activé",
+  USER_STATUS_INACTIVE: "Utilisateur désactivé",
+  PENALTY_RULE_CREATED: "Palier de pénalité créé",
+  PENALTY_RULE_UPDATED: "Palier de pénalité modifié",
+  PENALTY_RULE_DELETED: "Palier de pénalité supprimé",
   SHOP_CREATED: "Shop créé",
   SHOP_UPDATED: "Shop modifié",
   SHOP_ACTIVATED: "Shop activé",
@@ -96,7 +119,7 @@ function summarizeMetadata(meta: Record<string, unknown> | null | undefined): st
   if (meta.employeeNumber) parts.push(`Matricule: ${meta.employeeNumber}`);
   if (meta.name) parts.push(`${meta.name}`);
   if (meta.code) parts.push(`Code: ${meta.code}`);
-  if (meta.dayOfWeek) parts.push(`${meta.dayOfWeek}`);
+  if (meta.dayOfWeek) parts.push(DAY_LABELS[String(meta.dayOfWeek)] ?? String(meta.dayOfWeek));
   if (meta.amount !== undefined) parts.push(`${meta.amount} FCFA`);
   if (meta.status) parts.push(`Statut: ${meta.status}`);
   if (meta.firstName) parts.push(`${meta.firstName}${meta.lastName ? ` ${meta.lastName}` : ""}`);

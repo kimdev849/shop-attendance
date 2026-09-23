@@ -26,9 +26,59 @@ apiClient.interceptors.request.use((config) => {
 let isRefreshing = false;
 let pendingQueue: Array<() => void> = [];
 
+/**
+ * Traduction défensive des messages de validation class-validator parfois
+ * renvoyés en anglais par l'API (ex: "email must be an email"). Uniquement
+ * pour l'affichage — les messages métier de l'API sont déjà en français.
+ */
+const VALIDATION_FR: Array<[RegExp, string]> = [
+  [/must be a string/i, "doit être une chaîne de caractères"],
+  [/must be an email/i, "doit être un email valide"],
+  [/must be a UUID/i, "doit être un identifiant valide"],
+  [/must be an integer number/i, "doit être un nombre entier"],
+  [/must be a number conforming to the specified constraints/i, "doit respecter les contraintes numériques"],
+  [/must be a number/i, "doit être un nombre"],
+  [/must not be empty/i, "ne doit pas être vide"],
+  [/must be shorter than or equal to/i, "ne doit pas dépasser"],
+  [/must be longer than or equal to/i, "doit être au moins"],
+  [/must not be less than/i, "ne doit pas être inférieur à"],
+  [/must be one of the following values/i, "a une valeur non autorisée"],
+  [/should not exist/i, "n'est pas une propriété attendue"],
+];
+
+function translateValidationMessage(message: string): string {
+  let out = message;
+  for (const [pattern, fr] of VALIDATION_FR) {
+    if (pattern.test(out)) {
+      out = out.replace(pattern, fr);
+      break;
+    }
+  }
+  return out;
+}
+
+/**
+ * Normalise un message d'erreur pour l'affichage : NestJS renvoie `message`
+ * sous forme de tableau pour les erreurs de validation — on le joint en une
+ * chaîne lisible au lieu d'afficher "a,b,..." ou "[object Object]".
+ */
+function normalizeApiErrorMessage(message: unknown): unknown {
+  if (Array.isArray(message)) {
+    return message.map((m) => translateValidationMessage(String(m))).join(" · ");
+  }
+  if (typeof message === "string") return translateValidationMessage(message);
+  return message;
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Normalise le message d'erreur pour toutes les réponses en échec
+    // (affichage uniquement — ne change ni le statut ni la structure).
+    if (error.response?.data?.message !== undefined) {
+      error.response.data.message = normalizeApiErrorMessage(error.response.data.message);
+    }
+
     const originalRequest = error.config;
     if (error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
