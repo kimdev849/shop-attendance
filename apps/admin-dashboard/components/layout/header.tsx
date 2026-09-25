@@ -8,6 +8,7 @@ import { initials } from "@/lib/utils";
 import { useSidebar } from "./sidebar";
 
 const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "Super administrateur",
   ADMIN: "Administrateur",
   SHOP_MANAGER: "Gérant de shop",
   WORKER: "Travailleur",

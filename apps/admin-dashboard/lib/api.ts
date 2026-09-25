@@ -144,6 +144,8 @@ function invalidateDomain(domain: string) {
 export const api = {
   auth: {
     login: (email: string, password: string) => apiClient.post("/auth/login", { email, password }),
+    changePassword: (currentPassword: string, newPassword: string) =>
+      apiClient.post("/auth/change-password", { currentPassword, newPassword }),
   },
   dashboard: {
     stats: () => cachedGet("/dashboard/stats", undefined, 60_000),

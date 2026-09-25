@@ -47,6 +47,7 @@ const SidebarContext = createContext<SidebarContextValue>({
 // Libellés français des rôles — la valeur brute (ADMIN, SHOP_MANAGER…)
 // reste utilisée dans le code et l'API, seule l'affichage est traduit.
 const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "Super administrateur",
   ADMIN: "Administrateur",
   SHOP_MANAGER: "Gérant de shop",
   WORKER: "Travailleur",
@@ -69,7 +70,9 @@ export function useSidebar() {
 function DesktopSidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const items = NAV_ITEMS.filter((item: any) => !item.adminOnly || user?.role === "ADMIN");
+  const items = NAV_ITEMS.filter(
+    (item: any) => !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
+  );
 
   return (
     <aside className="hidden lg:flex lg:w-60 lg:shrink-0 lg:flex-col lg:border-r lg:border-border/50 lg:bg-card/80 lg:backdrop-blur-sm">
@@ -132,7 +135,9 @@ function DesktopSidebar() {
 function MobileBottomTabs() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const items = NAV_ITEMS.filter((item: any) => !item.adminOnly || user?.role === "ADMIN");
+  const items = NAV_ITEMS.filter(
+    (item: any) => !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
+  );
   // Show 5 most important items on bottom bar
   const bottomItems = items.slice(0, 5);
 
@@ -165,7 +170,9 @@ function MobileSlideOver() {
   const { mobileOpen, setMobileOpen } = useSidebar();
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const items = NAV_ITEMS.filter((item: any) => !item.adminOnly || user?.role === "ADMIN");
+  const items = NAV_ITEMS.filter(
+    (item: any) => !item.adminOnly || user?.role === "ADMIN" || user?.role === "SUPER_ADMIN",
+  );
   // Items not in the bottom bar
   const overflowItems = items.slice(5);
 

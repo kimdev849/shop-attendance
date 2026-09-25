@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Settings as SettingsIcon } from "lucide-react";
+import { Plus, Trash2, Settings as SettingsIcon, KeyRound } from "lucide-react";
 import { AppShell } from "@/components/layout/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,8 @@ interface PenaltyRule {
 
 export default function SettingsPage() {
   const [rules, setRules] = useState<PenaltyRule[]>([]);
+  const [pwdForm, setPwdForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwdSaving, setPwdSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [newRule, setNewRule] = useState({ fromMinutes: "", toMinutes: "", amount: "" });
   const [deleteTarget, setDeleteTarget] = useState<PenaltyRule | null>(null);
@@ -53,6 +55,24 @@ export default function SettingsPage() {
       load();
     } catch (err: any) {
       toast(err?.response?.data?.message ?? "Erreur.", "error");
+    }
+  }
+
+  async function handleChangePassword() {
+    setPwdSaving(true);
+    try {
+      await api.auth.changePassword(pwdForm.current, pwdForm.next);
+      toast("Mot de passe modifié. Veuillez vous reconnecter.", "success");
+      // Toutes les sessions ont été révoquées côté API : déconnexion locale.
+      localStorage.removeItem("sa_access_token");
+      localStorage.removeItem("sa_refresh_token");
+      localStorage.removeItem("sa_user");
+      document.cookie = "sa_access_token=; path=/; max-age=0";
+      window.location.href = "/login";
+    } catch (err: any) {
+      toast(err?.response?.data?.message ?? "Erreur lors du changement de mot de passe.", "error");
+    } finally {
+      setPwdSaving(false);
     }
   }
 
@@ -149,6 +169,62 @@ export default function SettingsPage() {
                 <Plus className="h-4 w-4" /> Ajouter
               </Button>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Mon compte — changement de mot de passe */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4" /> Mon compte — changer mon mot de passe
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Après le changement, toutes les sessions actives sont déconnectées et vous devrez vous
+            reconnecter avec le nouveau mot de passe.
+          </p>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="space-y-1.5">
+            <Label>Mot de passe actuel</Label>
+            <Input
+              type="password"
+              value={pwdForm.current}
+              onChange={(e) => setPwdForm({ ...pwdForm, current: e.target.value })}
+              autoComplete="current-password"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Nouveau mot de passe (min. 8 caractères)</Label>
+            <Input
+              type="password"
+              value={pwdForm.next}
+              onChange={(e) => setPwdForm({ ...pwdForm, next: e.target.value })}
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Confirmer le nouveau mot de passe</Label>
+            <Input
+              type="password"
+              value={pwdForm.confirm}
+              onChange={(e) => setPwdForm({ ...pwdForm, confirm: e.target.value })}
+              autoComplete="new-password"
+            />
+          </div>
+          <div className="sm:col-span-3">
+            <Button
+              onClick={handleChangePassword}
+              disabled={
+                pwdSaving ||
+                !pwdForm.current ||
+                pwdForm.next.length < 8 ||
+                pwdForm.next !== pwdForm.confirm ||
+                pwdForm.next === pwdForm.current
+              }
+            >
+              {pwdSaving ? "Enregistrement..." : "Changer mon mot de passe"}
+            </Button>
           </div>
         </CardContent>
       </Card>

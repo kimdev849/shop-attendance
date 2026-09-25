@@ -14,7 +14,10 @@ datasource db {
 // ENUMS
 // ---------------------------------------------------------------------------
 
+// SUPER_ADMIN : compte support/vendeur, au-dessus d'ADMIN.
+// Ne peut être créé ni modifié que par un autre SUPER_ADMIN (voir UsersService).
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   SHOP_MANAGER
   WORKER

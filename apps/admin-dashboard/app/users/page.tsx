@@ -30,12 +30,14 @@ interface User {
 }
 
 const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "Super administrateur",
   ADMIN: "Administrateur",
   SHOP_MANAGER: "Gérant de shop",
   WORKER: "Travailleur",
 };
 
-const ROLE_VARIANTS: Record<string, "default" | "secondary" | "warning"> = {
+const ROLE_VARIANTS: Record<string, "default" | "secondary" | "warning" | "destructive"> = {
+  SUPER_ADMIN: "destructive",
   ADMIN: "default",
   SHOP_MANAGER: "warning",
   WORKER: "secondary",
@@ -249,6 +251,7 @@ export default function UsersPage() {
               <option value="SHOP_MANAGER">Gérant de shop</option>
               <option value="WORKER">Travailleur</option>
             </Select>
+            <p className="text-xs text-muted-foreground">Le rôle Super administrateur est réservé au support de l'éditeur.</p>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Annuler</Button>
@@ -273,6 +276,7 @@ export default function UsersPage() {
               <option value="SHOP_MANAGER">Gérant de shop</option>
               <option value="WORKER">Travailleur</option>
             </Select>
+            <p className="text-xs text-muted-foreground">Le rôle Super administrateur est réservé au support de l'éditeur.</p>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setEditOpen(false)}>Annuler</Button>

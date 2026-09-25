@@ -54,4 +54,19 @@ export class AuthRepository {
       data: { revokedAt: new Date() },
     });
   }
+
+  /** Révoque toutes les sessions (refresh tokens) d'un utilisateur. */
+  async revokeAllRefreshTokensForUser(userId: string) {
+    return this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  async updateUserPassword(userId: string, passwordHash: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+  }
 }

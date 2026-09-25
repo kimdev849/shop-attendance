@@ -1,9 +1,11 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Public } from "../../common/decorators/public.decorator";
+import { CurrentUser, AuthenticatedUser } from "../../common/decorators/current-user.decorator";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { RefreshTokenDto } from "./dto/refresh-token.dto";
+import { ChangePasswordDto } from "./dto/change-password.dto";
 
 @ApiTags("auth")
 @Controller({ path: "auth", version: "1" })
@@ -29,5 +31,15 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   logout(@Body() dto: RefreshTokenDto) {
     return this.authService.logout(dto.refreshToken);
+  }
+
+  /**
+   * Self-service : l'utilisateur authentifié change son propre mot de passe.
+   * Toutes les sessions sont révoquées, reconnecter obligatoire.
+   */
+  @Post("change-password")
+  @HttpCode(HttpStatus.OK)
+  changePassword(@Body() dto: ChangePasswordDto, @CurrentUser() user: AuthenticatedUser) {
+    return this.authService.changePassword(user.userId, dto.currentPassword, dto.newPassword);
   }
 }

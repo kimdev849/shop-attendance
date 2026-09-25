@@ -96,6 +96,41 @@ export class AuthService {
     return { success: true };
   }
 
+  /**
+   * Changement de mot de passe self-service (tous rôles, SUPER_ADMIN inclus).
+   * Vérifie le mot de passe actuel, met à jour le hash puis révoque toutes les
+   * sessions existantes : l'utilisateur doit se reconnecter partout.
+   */
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.repository.findUserById(userId);
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException("Session invalide, veuillez vous reconnecter.");
+    }
+
+    const currentValid = await argon2.verify(user.passwordHash, currentPassword);
+    if (!currentValid) {
+      throw new UnauthorizedException("Le mot de passe actuel est incorrect.");
+    }
+    if (await argon2.verify(user.passwordHash, newPassword)) {
+      throw new ConflictException("Le nouveau mot de passe doit être différent de l'actuel.");
+    }
+
+    const passwordHash = await argon2.hash(newPassword);
+    await this.repository.updateUserPassword(userId, passwordHash);
+    // Révoque les refresh tokens de TOUTES les sessions (cet appareil inclus) :
+    // en cas de compromission, l'ancienne session ne survit pas au changement.
+    await this.repository.revokeAllRefreshTokensForUser(userId);
+
+    await this.auditService.log({
+      userId,
+      action: "PASSWORD_CHANGED",
+      entity: "User",
+      entityId: userId,
+    });
+
+    return { success: true, message: "Mot de passe modifié. Veuillez vous reconnecter." };
+  }
+
   async hashPassword(plain: string) {
     return argon2.hash(plain);
   }

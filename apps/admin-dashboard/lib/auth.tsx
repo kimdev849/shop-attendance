@@ -7,7 +7,7 @@ import { api } from "./api";
 export interface AuthUser {
   id: string;
   email: string;
-  role: "ADMIN" | "SHOP_MANAGER" | "WORKER";
+  role: "SUPER_ADMIN" | "ADMIN" | "SHOP_MANAGER" | "WORKER";
 }
 
 interface AuthContextValue {

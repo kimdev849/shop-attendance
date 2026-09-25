@@ -60,6 +60,23 @@ async function main() {
   });
   console.log(`Admin user ready: ${admin.email} / Admin123!`);
 
+  // --- Super administrateur (support/vendeur) -----------------------------
+  // Compte au-dessus des ADMIN : invisible dans leur liste d'utilisateurs,
+  // non modifiable par eux. Mot de passe à changer impérativement après seed.
+  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL ?? "support@shopattendance.local";
+  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD ?? "Support#2026!Admin";
+  const superAdminPasswordHash = await argon2.hash(superAdminPassword);
+  const superAdmin = await prisma.user.upsert({
+    where: { email: superAdminEmail },
+    update: {},
+    create: {
+      email: superAdminEmail,
+      passwordHash: superAdminPasswordHash,
+      role: "SUPER_ADMIN",
+    },
+  });
+  console.log(`Super admin user ready: ${superAdmin.email}`);
+
   // --- Shops --------------------------------------------------------------
   const shopSeeds = [
     { name: "Shop Centre", code: "SHP-CENTRE", city: "Brazzaville", address: "Avenue de la Paix" },

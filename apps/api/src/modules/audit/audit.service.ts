@@ -25,6 +25,9 @@ export class AuditService {
     const { userId, action, entity, page = 1, limit = 50 } = params;
 
     const where: any = {};
+    // Les actions du compte SUPER_ADMIN (support) ne sont pas exposées
+    // au dashboard client.
+    where.user = { role: { not: "SUPER_ADMIN" } };
     if (userId) where.userId = userId;
     if (action) where.action = action;
     if (entity) where.entity = entity;

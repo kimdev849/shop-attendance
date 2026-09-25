@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 
 interface RoleGateProps {
   /** Rôles autorisés à voir le contenu. */
-  allowed: ("ADMIN" | "SHOP_MANAGER" | "WORKER")[];
+  allowed: ("SUPER_ADMIN" | "ADMIN" | "SHOP_MANAGER" | "WORKER")[];
   children: ReactNode;
   /** Contenu affiché si le rôle n'est pas autorisé (rien par défaut). */
   fallback?: ReactNode;
