@@ -575,36 +575,37 @@ function WorkerForm({ form, setForm, shops, schedules, setSchedules, onSubmit, o
               {schedules.map((s, i) => {
                 const timesValid = TIME_PATTERN.test(s.startTime) && TIME_PATTERN.test(s.endTime) && s.startTime < s.endTime;
                 return (
-                  <div key={i} className="space-y-2 rounded-md border border-border/60 p-2">
-                    <div className="flex items-center gap-2">
-                      <Select value={s.dayOfWeek} onChange={(e) => updateScheduleRow(i, { dayOfWeek: e.target.value })} className="flex-1">
-                        {DAY_OPTIONS.map((d) => <option key={d} value={d}>{DAY_LABELS[d]}</option>)}
-                      </Select>
+                  <div key={i} className="rounded-md border border-border/60 p-2">
+                    <div className="flex items-end gap-2">
+                      <div className="min-w-0 flex-[1.4] space-y-1">
+                        <Label className="text-xs">Jour</Label>
+                        <Select value={s.dayOfWeek} onChange={(e) => updateScheduleRow(i, { dayOfWeek: e.target.value })}>
+                          {DAY_OPTIONS.map((d) => <option key={d} value={d}>{DAY_LABELS[d]}</option>)}
+                        </Select>
+                      </div>
+                      <div className="w-20 space-y-1">
+                        <Label className="text-xs">Arrivée</Label>
+                        <Input type="time" value={s.startTime} onChange={(e) => updateScheduleRow(i, { startTime: e.target.value })} />
+                      </div>
+                      <div className="w-20 space-y-1">
+                        <Label className="text-xs">Sortie</Label>
+                        <Input type="time" value={s.endTime} onChange={(e) => updateScheduleRow(i, { endTime: e.target.value })} />
+                      </div>
+                      <div className="w-16 space-y-1">
+                        <Label className="text-xs">Tolér.</Label>
+                        <Input type="number" min={0} value={s.toleranceMinutes} onChange={(e) => updateScheduleRow(i, { toleranceMinutes: e.target.value })} />
+                      </div>
                       <button
                         type="button"
                         onClick={() => setSchedules(schedules.filter((_, j) => j !== i))}
-                        className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        className="mb-0.5 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                         title="Retirer ce jour"
                       >
                         <X className="h-4 w-4" />
                       </button>
                     </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Arrivée</Label>
-                        <Input type="time" value={s.startTime} onChange={(e) => updateScheduleRow(i, { startTime: e.target.value })} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Sortie</Label>
-                        <Input type="time" value={s.endTime} onChange={(e) => updateScheduleRow(i, { endTime: e.target.value })} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Tolérance (min)</Label>
-                        <Input type="number" min={0} value={s.toleranceMinutes} onChange={(e) => updateScheduleRow(i, { toleranceMinutes: e.target.value })} />
-                      </div>
-                    </div>
                     {!timesValid && (
-                      <p className="text-xs text-destructive">L'heure d'arrivée doit précéder l'heure de sortie.</p>
+                      <p className="mt-1.5 text-xs text-destructive">L'heure d'arrivée doit précéder l'heure de sortie.</p>
                     )}
                   </div>
                 );

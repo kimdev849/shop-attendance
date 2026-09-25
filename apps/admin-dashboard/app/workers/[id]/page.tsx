@@ -404,31 +404,31 @@ export default function WorkerDetailPage() {
         </div>
       </Modal>
 
-      {/* Schedule modal (create or edit) */}
-      <Modal open={scheduleOpen} onClose={() => setScheduleOpen(false)} title={scheduleForm.id ? "Modifier l'horaire" : "Ajouter un horaire"} className="max-w-md">
-        <div className="space-y-4">
-          <div className="space-y-1.5"><Label>Jour *</Label>
+      {/* Schedule modal (create or edit) — compacte */}
+      <Modal open={scheduleOpen} onClose={() => setScheduleOpen(false)} title={scheduleForm.id ? "Modifier l'horaire" : "Ajouter un horaire"} className="max-w-xs p-4">
+        <div className="space-y-3">
+          <div className="space-y-1"><Label className="text-xs">Jour *</Label>
             <Select value={scheduleForm.dayOfWeek} disabled={!!scheduleForm.id} onChange={(e) => setScheduleForm({ ...scheduleForm, dayOfWeek: e.target.value })}>
               {DAY_OPTIONS.map((d) => <option key={d} value={d}>{DAY_LABELS[d]}</option>)}
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5"><Label>Heure d'arrivée *</Label>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1"><Label className="text-xs">Arrivée *</Label>
               <Input type="time" value={scheduleForm.startTime} onChange={(e) => setScheduleForm({ ...scheduleForm, startTime: e.target.value })} />
             </div>
-            <div className="space-y-1.5"><Label>Heure de départ *</Label>
+            <div className="space-y-1"><Label className="text-xs">Sortie *</Label>
               <Input type="time" value={scheduleForm.endTime} onChange={(e) => setScheduleForm({ ...scheduleForm, endTime: e.target.value })} />
             </div>
-          </div>
-          <div className="space-y-1.5"><Label>Tolérance (minutes)</Label>
-            <Input type="number" min={0} value={scheduleForm.toleranceMinutes} onChange={(e) => setScheduleForm({ ...scheduleForm, toleranceMinutes: e.target.value })} />
+            <div className="space-y-1"><Label className="text-xs">Tolérance (min)</Label>
+              <Input type="number" min={0} value={scheduleForm.toleranceMinutes} onChange={(e) => setScheduleForm({ ...scheduleForm, toleranceMinutes: e.target.value })} />
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            Le retard retenu est le retard réel moins la tolérance. Un pointage au-delà génère une pénalité selon les règles configurées.
+            Pénalité au-delà de la tolérance, selon les règles configurées.
           </p>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setScheduleOpen(false)}>Annuler</Button>
-            <Button onClick={handleScheduleSubmit} disabled={scheduleSaving || !scheduleFormValid}>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setScheduleOpen(false)}>Annuler</Button>
+            <Button size="sm" onClick={handleScheduleSubmit} disabled={scheduleSaving || !scheduleFormValid}>
               {scheduleSaving ? "Enregistrement..." : "Enregistrer"}
             </Button>
           </div>
