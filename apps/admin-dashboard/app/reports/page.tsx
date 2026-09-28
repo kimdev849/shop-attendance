@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, FileBarChart } from "lucide-react";
+import { FileBarChart, FileSpreadsheet } from "lucide-react";
 import { AppShell } from "@/components/layout/shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useToast } from "@/components/ui/toast";
 import { api, apiClient } from "@/lib/api";
 import { formatDate, formatTime, formatFcfa } from "@/lib/utils";
 
@@ -32,11 +33,13 @@ function defaultDateRange() {
 }
 
 export default function ReportsPage() {
+  const { toast } = useToast();
   const [type, setType] = useState<ReportType>("attendance");
   const [range, setRange] = useState(defaultDateRange());
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const reportFn: Record<ReportType, (p: any) => Promise<any>> = {
     attendance: api.reports.attendance,
@@ -56,19 +59,46 @@ export default function ReportsPage() {
     }
   }
 
-  async function handleExportCsv() {
-    const { data } = await apiClient.get("/reports/attendance", {
-      params: { from: range.from, to: range.to, format: "csv" },
-      responseType: "blob",
-    });
-    const url = window.URL.createObjectURL(new Blob([data], { type: "text/csv;charset=utf-8;" }));
+  function downloadBlob(blob: Blob, filename: string) {
+    const url = window.URL.createObjectURL(new Blob([blob]));
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `rapport-${type}-${range.from}-${range.to}.csv`);
+    link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.URL.revokeObjectURL(url);
+  }
+
+  /** Exporte le rapport affiché au format Excel (.xlsx). */
+  async function handleExportExcel() {
+    setExporting(true);
+    try {
+      const response = await apiClient.get("/reports/attendance", {
+        params: { from: range.from, to: range.to, format: "excel" },
+        responseType: "blob",
+      });
+      downloadBlob(response.data, `rapport-${type}-${range.from}-${range.to}.xlsx`);
+      toast("Rapport exporté en Excel.", "success");
+    } catch (err: any) {
+      toast(err?.response?.data?.message ?? "Erreur lors de l'export.", "error");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  /** Exporte TOUS les rapports dans un seul classeur Excel (une feuille par rapport). */
+  async function handleExportAllExcel() {
+    setExporting(true);
+    try {
+      const response = await api.reports.exportAll({ from: range.from, to: range.to });
+      downloadBlob(response.data, `rapports-${range.from}-${range.to}.xlsx`);
+      toast("Tous les rapports ont été exportés en Excel.", "success");
+    } catch (err: any) {
+      toast(err?.response?.data?.message ?? "Erreur lors de l'export.", "error");
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -94,14 +124,22 @@ export default function ReportsPage() {
             <Button onClick={handleGenerate} disabled={loading} className="flex-1">
               <FileBarChart className="h-4 w-4" /> {loading ? "Génération..." : "Générer"}
             </Button>
-            {type === "attendance" && generated && rows.length > 0 && (
-              <Button variant="outline" onClick={handleExportCsv} title="Exporter en CSV">
-                <Download className="h-4 w-4" />
+            {generated && rows.length > 0 && (
+              <Button variant="outline" onClick={handleExportExcel} disabled={exporting} title="Exporter en Excel">
+                <FileSpreadsheet className="h-4 w-4" />
               </Button>
             )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Export global : tous les rapports dans un seul classeur Excel */}
+      <div className="mb-6 flex justify-end">
+        <Button variant="outline" onClick={handleExportAllExcel} disabled={exporting}>
+          <FileSpreadsheet className="h-4 w-4" />
+          {exporting ? "Export en cours..." : "Exporter tous les rapports"}
+        </Button>
+      </div>
 
       <Card>
         <CardContent className="p-0">

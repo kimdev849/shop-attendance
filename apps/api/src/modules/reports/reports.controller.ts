@@ -20,34 +20,53 @@ export class ReportsController {
     @Query("to") to: string,
     @Query("shopId") shopId?: string,
     @Query("workerId") workerId?: string,
-    @Query("format") format: "json" | "csv" = "json",
+    @Query("format") format: "json" | "excel" = "json",
     @Res({ passthrough: true }) res?: Response,
   ) {
     const rows = await this.reportsService.attendanceReport({ from, to, shopId, workerId });
-    if (format === "csv") {
+    if (format === "excel") {
       const flat = this.reportsService.flattenAttendanceForExport(rows);
-      const csv = this.reportsService.toCsv(flat);
+      const buffer = await this.reportsService.toExcelWorkbook([
+        { name: "Pointages", rows: flat },
+      ]);
       res?.set({
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="rapport-pointages-${from}-${to}.csv"`,
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="rapport-pointages-${from}-${to}.xlsx"`,
       });
-      return csv;
+      return buffer;
     }
     return rows;
   }
 
-  @Get("lateness")
-  lateness(@Query("from") from: string, @Query("to") to: string, @Query("shopId") shopId?: string) {
-    return this.reportsService.latenessReport({ from, to, shopId });
-  }
+  /**
+   * Exporte TOUS les rapports dans un seul classeur Excel
+   * (une feuille par type de rapport : Pointages, Retards, Absences, Pénalités).
+   */
+  @Get("export")
+  async exportAll(
+    @Query("from") from: string,
+    @Query("to") to: string,
+    @Query("shopId") shopId?: string,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const [attendance, lateness, absences, penalties] = await Promise.all([
+      this.reportsService.attendanceReport({ from, to, shopId }),
+      this.reportsService.latenessReport({ from, to, shopId }),
+      this.reportsService.absencesReport({ from, to, shopId }),
+      this.reportsService.penaltiesReport({ from, to, shopId }),
+    ]);
 
-  @Get("absences")
-  absences(@Query("from") from: string, @Query("to") to: string, @Query("shopId") shopId?: string) {
-    return this.reportsService.absencesReport({ from, to, shopId });
-  }
+    const buffer = await this.reportsService.toExcelWorkbook([
+      { name: "Pointages", rows: this.reportsService.flattenAttendanceForExport(attendance) },
+      { name: "Retards", rows: this.reportsService.flattenAttendanceForExport(lateness.filter((r: any) => (r.latenessMinutes ?? 0) > 0)) },
+      { name: "Absences", rows: absences as any[] },
+      { name: "Pénalités", rows: this.reportsService.flattenPenaltiesForExport(penalties) },
+    ]);
 
-  @Get("penalties")
-  penalties(@Query("from") from: string, @Query("to") to: string, @Query("shopId") shopId?: string) {
-    return this.reportsService.penaltiesReport({ from, to, shopId });
+    res?.set({
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="rapports-${from}-${to}.xlsx"`,
+    });
+    return buffer;
   }
 }

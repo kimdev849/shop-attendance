@@ -223,5 +223,7 @@ export const api = {
     lateness: (params: Record<string, string | undefined>) => cachedGet("/reports/lateness", params, 60_000),
     absences: (params: Record<string, string | undefined>) => cachedGet("/reports/absences", params, 60_000),
     penalties: (params: Record<string, string | undefined>) => cachedGet("/reports/penalties", params, 60_000),
+    exportAll: (params: Record<string, string | undefined>) =>
+      apiClient.get("/reports/export", { params, responseType: "blob" }),
   },
 };
