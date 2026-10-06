@@ -3,13 +3,14 @@ import { AttendanceService } from "./attendance.service";
 import { AttendanceController } from "./attendance.controller";
 import { AttendanceRepository } from "./attendance.repository";
 import { AuditModule } from "../audit/audit.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 import { DevicesModule } from "../devices/devices.module";
 import { SchedulesModule } from "../schedules/schedules.module";
 import { PenaltiesModule } from "../penalties/penalties.module";
 import { WorkersModule } from "../workers/workers.module";
 
 @Module({
-  imports: [AuditModule, DevicesModule, SchedulesModule, PenaltiesModule, WorkersModule],
+  imports: [AuditModule, NotificationsModule, DevicesModule, SchedulesModule, PenaltiesModule, WorkersModule],
   providers: [AttendanceService, AttendanceRepository],
   controllers: [AttendanceController],
   exports: [AttendanceService],
