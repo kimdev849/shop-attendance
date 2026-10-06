@@ -3,8 +3,8 @@ CREATE TYPE "NotificationType" AS ENUM ('LATE_CHECK_IN', 'ABSENCE', 'PENALTY', '
 
 -- CreateTable
 CREATE TABLE "notifications" (
-    "id" UUID NOT NULL,
-    "userId" UUID NOT NULL,
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
     "type" "NotificationType" NOT NULL DEFAULT 'SYSTEM',
     "title" TEXT NOT NULL,
     "message" TEXT NOT NULL,
