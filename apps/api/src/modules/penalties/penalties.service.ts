@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { PenaltyStatus } from "@prisma/client";
+import { NotificationType, PenaltyStatus } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PenaltiesRepository } from "./penalties.repository";
 import { PenaltyQueryParams } from "./types/penalties.types";
 
@@ -9,6 +10,7 @@ export class PenaltiesService {
   constructor(
     private readonly repository: PenaltiesRepository,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(params: PenaltyQueryParams) {
@@ -78,6 +80,16 @@ export class PenaltiesService {
         lastName: (penalty as any).worker?.lastName,
       },
     });
+    const workerLabel = (penalty as any).worker
+      ? `${(penalty as any).worker.firstName} ${(penalty as any).worker.lastName}`
+      : "un travailleur";
+    await this.notificationsService.notifyAdmins({
+      type: NotificationType.PENALTY,
+      title: "Pénalité approuvée",
+      message: `La pénalité de ${penalty.amount} FCFA de ${workerLabel} a été approuvée.`,
+      entity: "Penalty",
+      entityId: id,
+    });
     return updated;
   }
 
@@ -103,6 +115,16 @@ export class PenaltiesService {
         lastName: (penalty as any).worker?.lastName,
       },
     });
+    const workerLabel = (penalty as any).worker
+      ? `${(penalty as any).worker.firstName} ${(penalty as any).worker.lastName}`
+      : "un travailleur";
+    await this.notificationsService.notifyAdmins({
+      type: NotificationType.PENALTY,
+      title: "Pénalité rejetée",
+      message: `La pénalité de ${penalty.amount} FCFA de ${workerLabel} a été rejetée.`,
+      entity: "Penalty",
+      entityId: id,
+    });
     return updated;
   }
 
@@ -125,6 +147,16 @@ export class PenaltiesService {
         firstName: (penalty as any).worker?.firstName,
         lastName: (penalty as any).worker?.lastName,
       },
+    });
+    const workerLabel = (penalty as any).worker
+      ? `${(penalty as any).worker.firstName} ${(penalty as any).worker.lastName}`
+      : "un travailleur";
+    await this.notificationsService.notifyAdmins({
+      type: NotificationType.PENALTY,
+      title: "Pénalité annulée",
+      message: `La pénalité de ${penalty.amount} FCFA de ${workerLabel} a été annulée.`,
+      entity: "Penalty",
+      entityId: id,
     });
     return updated;
   }

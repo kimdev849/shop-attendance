@@ -6,6 +6,7 @@ describe("AttendanceService", () => {
   let service: AttendanceService;
   let repository: any;
   let auditService: any;
+  let notificationsService: any;
   let devicesService: any;
   let schedulesService: any;
   let penaltyCalculator: any;
@@ -37,6 +38,7 @@ describe("AttendanceService", () => {
       updateCheckInPhoto: jest.fn(),
     };
     auditService = { log: jest.fn() };
+    notificationsService = { notifyAdmins: jest.fn().mockResolvedValue(undefined) };
     devicesService = { touch: jest.fn().mockResolvedValue({}) };
     schedulesService = { findApplicableSchedule: jest.fn() };
     penaltyCalculator = { computeLateness: jest.fn(), computePenaltyAmount: jest.fn() };
@@ -44,6 +46,7 @@ describe("AttendanceService", () => {
     service = new AttendanceService(
       repository,
       auditService,
+      notificationsService,
       devicesService,
       schedulesService,
       penaltyCalculator,
@@ -148,6 +151,9 @@ describe("AttendanceService", () => {
         amount: 1000,
         status: "PENDING",
       }),
+    );
+    expect(notificationsService.notifyAdmins).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "LATE_CHECK_IN" }),
     );
   });
 

@@ -4,8 +4,9 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { AttendanceStatus } from "@prisma/client";
+import { AttendanceStatus, NotificationType } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { DevicesService } from "../devices/devices.service";
 import { SchedulesService } from "../schedules/schedules.service";
 import { PenaltyCalculatorService } from "../penalties/penalty-calculator.service";
@@ -40,6 +41,7 @@ export class AttendanceService {
   constructor(
     private readonly repository: AttendanceRepository,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
     private readonly devicesService: DevicesService,
     private readonly schedulesService: SchedulesService,
     private readonly penaltyCalculator: PenaltyCalculatorService,
@@ -248,6 +250,17 @@ export class AttendanceService {
         latenessMinutes,
       },
     });
+
+    // Notification in-app aux admins en cas de retard (jamais bloquante).
+    if (status === AttendanceStatus.LATE) {
+      await this.notificationsService.notifyAdmins({
+        type: NotificationType.LATE_CHECK_IN,
+        title: "Retard au pointage",
+        message: `${worker.firstName} ${worker.lastName} (${worker.employeeNumber}) est arrivé avec ${latenessMinutes} minute(s) de retard au shop ${shop.name}.`,
+        entity: "Attendance",
+        entityId: attendance.id,
+      });
+    }
 
     // 10. Retourner le résultat
     return this.toResult(attendance, penalty, 'CHECK_IN');

@@ -218,6 +218,13 @@ export const api = {
   auditLogs: {
     list: (params?: Record<string, string | number | undefined>) => cachedGet("/audit-logs", params),
   },
+  notifications: {
+    // Pas de cache : le badge et le dropdown doivent refléter l'état en temps réel.
+    list: (params?: Record<string, string | number | undefined>) => apiClient.get("/notifications", { params }),
+    unreadCount: () => apiClient.get("/notifications/unread-count"),
+    markAsRead: (id: string) => apiClient.patch(`/notifications/${id}/read`),
+    markAllAsRead: () => apiClient.patch("/notifications/read-all"),
+  },
   reports: {
     attendance: (params: Record<string, string | undefined>) => cachedGet("/reports/attendance", params, 60_000),
     lateness: (params: Record<string, string | undefined>) => cachedGet("/reports/lateness", params, 60_000),

@@ -75,6 +75,13 @@ enum AbsenceStatus {
   REJECTED
 }
 
+enum NotificationType {
+  LATE_CHECK_IN
+  ABSENCE
+  PENALTY
+  SYSTEM
+}
+
 // ---------------------------------------------------------------------------
 // MODELS
 // ---------------------------------------------------------------------------
@@ -91,6 +98,7 @@ model User {
   worker         Worker?
   managedShops   Shop[]        @relation("ShopManager")
   auditLogs      AuditLog[]
+  notifications  Notification[]
   approvedPenalties Penalty[]  @relation("PenaltyApprovedBy")
   validatedAbsences Absence[]  @relation("AbsenceValidatedBy")
   refreshTokens  RefreshToken[]
@@ -300,4 +308,23 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// Notification in-app destinée aux utilisateurs du dashboard (admin, gérant).
+// Émise aux événements métier : retard au pointage, absence, pénalité.
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType @default(SYSTEM)
+  title     String
+  message   String
+  entity    String? // e.g. "Attendance", "Absence", "Penalty" — pour la navigation
+  entityId  String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+  @@map("notifications")
 }

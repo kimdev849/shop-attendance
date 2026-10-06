@@ -18,6 +18,9 @@ export * from "./penalty";
 // Shop domain
 export * from "./shop";
 
+// Notification domain
+export * from "./notification";
+
 // Device domain
 export * from "./device";
 

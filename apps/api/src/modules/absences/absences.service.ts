@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { NotificationType } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
+import { NotificationsService } from "../notifications/notifications.service";
 import { AbsencesRepository } from "./absences.repository";
 
 @Injectable()
@@ -7,6 +9,7 @@ export class AbsencesService {
   constructor(
     private readonly repository: AbsencesRepository,
     private readonly auditService: AuditService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAll(params: {
@@ -78,6 +81,13 @@ export class AbsencesService {
       entityId: id,
       metadata: { workerId: absence.workerId },
     });
+    await this.notificationsService.notifyAdmins({
+      type: NotificationType.ABSENCE,
+      title: "Absence validée",
+      message: `L'absence de ${absence.worker.firstName} ${absence.worker.lastName} du ${new Date(absence.date).toLocaleDateString("fr-FR")} a été validée.`,
+      entity: "Absence",
+      entityId: id,
+    });
     return updated;
   }
 
@@ -90,6 +100,13 @@ export class AbsencesService {
       entity: "Absence",
       entityId: id,
       metadata: { workerId: absence.workerId },
+    });
+    await this.notificationsService.notifyAdmins({
+      type: NotificationType.ABSENCE,
+      title: "Absence rejetée",
+      message: `L'absence de ${absence.worker.firstName} ${absence.worker.lastName} du ${new Date(absence.date).toLocaleDateString("fr-FR")} a été rejetée.`,
+      entity: "Absence",
+      entityId: id,
     });
     return updated;
   }

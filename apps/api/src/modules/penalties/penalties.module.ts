@@ -5,9 +5,10 @@ import { PenaltyCalculatorService } from "./penalty-calculator.service";
 import { PenaltiesController, PenaltyRulesController } from "./penalties.controller";
 import { PenaltiesRepository } from "./penalties.repository";
 import { AuditModule } from "../audit/audit.module";
+import { NotificationsModule } from "../notifications/notifications.module";
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, NotificationsModule],
   providers: [PenaltiesService, PenaltyRulesService, PenaltyCalculatorService, PenaltiesRepository],
   controllers: [PenaltiesController, PenaltyRulesController],
   exports: [PenaltiesService, PenaltyRulesService, PenaltyCalculatorService],

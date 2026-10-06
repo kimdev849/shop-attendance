@@ -1,11 +1,12 @@
 "use client";
 
-import { LogOut, Menu, Moon, Sun, Bell } from "lucide-react";
+import { LogOut, Menu, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { initials } from "@/lib/utils";
 import { useSidebar } from "./sidebar";
+import { NotificationBell } from "./notification-bell";
 
 const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: "Super administrateur",
@@ -49,10 +50,7 @@ export function Header({ title }: { title: string }) {
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>
 
-        <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl">
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary" />
-        </Button>
+        <NotificationBell />
 
         <div className="hidden items-center gap-2 rounded-full bg-secondary/60 pl-1 pr-3 py-1 sm:flex">
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
